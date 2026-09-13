@@ -1,0 +1,2 @@
+-- After creating a user in Supabase Auth, run:
+-- update public.profiles set role = 'super_admin', is_active = true where email = 'your-admin@example.com';

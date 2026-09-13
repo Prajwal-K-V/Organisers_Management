@@ -1,0 +1,13 @@
+-- Hosted DB repair: run each migration below in the Supabase SQL Editor, in order.
+-- 1. supabase/migrations/20250913120000_add_teams_purse_remaining.sql
+-- 2. supabase/migrations/20250913125000_create_financial_ledger.sql
+-- 3. supabase/migrations/20250913145000_align_players_schema.sql
+-- 4. supabase/migrations/20250913150000_players_player_code.sql
+-- 5. supabase/migrations/20250913160000_players_role_and_insert_defaults.sql
+-- 6. supabase/migrations/20250913170000_align_auction_status_enum.sql
+-- 7. supabase/migrations/20250913180000_auction_sessions_created_by.sql
+-- 8. supabase/migrations/20250913190000_auction_rpc_functions.sql
+-- 8b. supabase/migrations/20250913200000_tournaments_settings.sql (if place_bid errors on t.settings)
+-- 9. supabase/migrations/20250913210000_players_status_consistency.sql
+-- 9. (optional) supabase/migrations/20250913130000_ledger_entry_income.sql
+-- 10. (optional) supabase/migrations/20250913130001_ledger_entry_income_policy.sql
