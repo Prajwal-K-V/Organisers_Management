@@ -4,6 +4,7 @@ import { requireSuperAdmin } from "@/utils/supabase/utility/auth";
 import { createClient } from "@/utils/supabase/server";
 import { cookies } from "next/headers";
 import { createAdminClient } from "@/utils/supabase/admin";
+import { authMetadataFromProfile } from "@/lib/auth-metadata";
 import { redirectWithFlash } from "@/lib/flash";
 
 const ORGANIZERS_PATH = "/admin/organizers";
@@ -27,6 +28,35 @@ export async function createTournament(formData: FormData) {
   redirectWithFlash(TOURNAMENTS_PATH, "success", `Tournament “${name}” created.`);
 }
 
+export async function assignTournamentOrganizer(formData: FormData) {
+  await requireSuperAdmin();
+  const tournamentId = String(formData.get("tournament_id") ?? "");
+  const organizerId = String(formData.get("organizer_id") ?? "");
+  if (!tournamentId) redirectWithFlash(TOURNAMENTS_PATH, "error", "Tournament missing.");
+  if (!organizerId) redirectWithFlash(TOURNAMENTS_PATH, "error", "Select an organizer.");
+
+  const cookieStore = await cookies();
+  const supabase = createClient(cookieStore);
+
+  const { data: organizer } = await supabase
+    .from("profiles")
+    .select("id, is_active")
+    .eq("id", organizerId)
+    .eq("role", "organizer")
+    .single();
+  if (!organizer) redirectWithFlash(TOURNAMENTS_PATH, "error", "Organizer not found.");
+  if (!organizer.is_active) {
+    redirectWithFlash(TOURNAMENTS_PATH, "error", "Activate the organizer before assigning tournaments.");
+  }
+
+  const { error } = await supabase
+    .from("tournaments")
+    .update({ organizer_id: organizerId })
+    .eq("id", tournamentId);
+  if (error) redirectWithFlash(TOURNAMENTS_PATH, "error", error.message);
+  redirectWithFlash(TOURNAMENTS_PATH, "success", "Organizer assigned to tournament.");
+}
+
 export async function toggleOrganizerActiveForm(formData: FormData) {
   const organizerId = String(formData.get("organizer_id") ?? "");
   const isActive = String(formData.get("is_active") ?? "false") === "true";
@@ -43,6 +73,16 @@ export async function toggleOrganizerActive(organizerId: string, isActive: boole
     .eq("id", organizerId)
     .eq("role", "organizer");
   if (error) redirectWithFlash(ORGANIZERS_PATH, "error", error.message);
+
+  try {
+    const admin = createAdminClient();
+    await admin.auth.admin.updateUserById(organizerId, {
+      user_metadata: authMetadataFromProfile({ role: "organizer", is_active: isActive }),
+    });
+  } catch {
+    // Profile updated; metadata sync is best-effort until next login.
+  }
+
   redirectWithFlash(ORGANIZERS_PATH, "success", isActive ? "Organizer activated." : "Organizer deactivated.");
 }
 

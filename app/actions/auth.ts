@@ -3,6 +3,7 @@
 import { createClient } from "@/utils/supabase/server";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { authMetadataFromProfile } from "@/lib/auth-metadata";
 import { getPostLoginPath } from "@/utils/supabase/utility/auth";
 import { getSessionProfile } from "@/utils/supabase/utility/profile";
 
@@ -32,6 +33,8 @@ export async function signInWithPassword(formData: FormData) {
     await supabase.auth.signOut();
     redirect("/login?error=inactive");
   }
+
+  await supabase.auth.updateUser({ data: authMetadataFromProfile(profile) });
 
   redirect(getPostLoginPath(profile.role));
 }

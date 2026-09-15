@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { type NextRequest, NextResponse } from "next/server";
+import { isActiveFromUserMetadata, roleFromUserMetadata } from "@/lib/auth-metadata";
 import type { UserRole } from "@/types/database";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -46,14 +47,22 @@ export async function updateSession(request: NextRequest) {
   let isActive = false;
 
   if (user) {
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("role, is_active")
-      .eq("id", user.id)
-      .single();
-    if (profile) {
-      role = profile.role as UserRole;
-      isActive = profile.is_active;
+    const meta = user.user_metadata as Record<string, unknown> | undefined;
+    const metaRole = roleFromUserMetadata(meta);
+    const metaActive = isActiveFromUserMetadata(meta);
+    if (metaRole !== null && metaActive !== null) {
+      role = metaRole;
+      isActive = metaActive;
+    } else {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role, is_active")
+        .eq("id", user.id)
+        .single();
+      if (profile) {
+        role = profile.role as UserRole;
+        isActive = profile.is_active;
+      }
     }
   }
 

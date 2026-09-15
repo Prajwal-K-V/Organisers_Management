@@ -2,10 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useStartNavigation } from "@/components/pending-provider";
 import { cn } from "@/lib/utils";
 
 export function TournamentTabs({ tabs }: { tabs: { href: string; label: string }[] }) {
   const pathname = usePathname();
+  const startNavigation = useStartNavigation();
 
   return (
     <nav className="-mx-1 flex gap-2 overflow-x-auto border-b border-[var(--border-subtle)] pb-4 px-1 [scrollbar-width:thin]">
@@ -15,6 +17,7 @@ export function TournamentTabs({ tabs }: { tabs: { href: string; label: string }
           <Link
             key={tab.href}
             href={tab.href}
+            onClick={() => startNavigation()}
             className={cn(
               "shrink-0 whitespace-nowrap rounded-full px-4 py-1.5 text-sm font-semibold transition",
               active
