@@ -2,7 +2,8 @@
   command = "npm run build"
 
 [build.environment]
-  SECRETS_SCAN_OMIT_KEYS = "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,NEXT_PUBLIC_SUPABASE_URL"
+  SECRETS_SCAN_OMIT_KEYS = "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,NEXT_PUBLIC_SUPABASE_URL,NEXT_PUBLIC_SITE_URL"
+  SECRETS_SCAN_OMIT_PATHS = ".netlify/.next/cache/**"
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
