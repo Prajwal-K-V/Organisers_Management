@@ -16,10 +16,10 @@ import type { Profile, Tournament } from "@/types/database";
 
 export function AdminOrganizersManager({
   organizers,
-  tournaments,
+  tournaments = [],
 }: {
   organizers: Profile[];
-  tournaments: Pick<Tournament, "id" | "name" | "status">[];
+  tournaments?: Pick<Tournament, "id" | "name" | "status">[];
 }) {
   const [open, setOpen] = useState(false);
 
