@@ -1,11 +1,16 @@
 import Link from "next/link";
 import { DashboardDateFilter } from "@/components/dashboard-date-filter";
+import { DashboardHero } from "@/components/dashboard-hero";
 import { DashboardStatCard } from "@/components/dashboard-stat-card";
 import { PageHeader } from "@/components/page-header";
 import { TournamentListItem } from "@/components/tournament-list-item";
-import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { formatCredits, sumLedgerFlows } from "@/lib/dashboard-finance";
+import {
+  fetchOrganizerPlayers,
+  fetchOrganizerTeams,
+  fetchOrganizerTournaments,
+} from "@/lib/organizer-queries";
 import { requireOrganizer } from "@/utils/supabase/utility/auth";
 
 function endOfDayIso(date: string) {
@@ -20,14 +25,11 @@ export default async function OrganizerDashboardPage({
   const { supabase, profile } = await requireOrganizer();
   const { from, to } = await searchParams;
 
-  const { data: tournaments } = await supabase
-    .from("tournaments")
-    .select("id, name, status, created_at")
-    .order("created_at", { ascending: false });
+  const tournaments = await fetchOrganizerTournaments(supabase);
 
-  const tournamentIds = (tournaments ?? []).map((t) => t.id);
+  const tournamentIds = tournaments.map((t) => t.id);
 
-  const [ledgerRes, teamsRes, playersRes] = await Promise.all([
+  const [ledgerRes, teamRows, playerRows] = await Promise.all([
     (async () => {
       if (!tournamentIds.length) return { data: [] as { entry_type: string; amount: number }[] };
       let q = supabase
@@ -40,17 +42,21 @@ export default async function OrganizerDashboardPage({
       return q;
     })(),
     tournamentIds.length
-      ? supabase.from("teams").select("id", { count: "exact", head: true }).in("tournament_id", tournamentIds)
-      : Promise.resolve({ count: 0 }),
+      ? Promise.all(tournamentIds.map((tid) => fetchOrganizerTeams(supabase, tid))).then((lists) =>
+          lists.flat()
+        )
+      : Promise.resolve([]),
     tournamentIds.length
-      ? supabase.from("players").select("id, status").in("tournament_id", tournamentIds)
-      : Promise.resolve({ data: [] as { id: string; status: string }[] }),
+      ? Promise.all(tournamentIds.map((tid) => fetchOrganizerPlayers(supabase, tid))).then((lists) =>
+          lists.flat()
+        )
+      : Promise.resolve([]),
   ]);
 
   const finance = sumLedgerFlows(ledgerRes.data ?? []);
-  const players = playersRes.data ?? [];
+  const players = playerRows;
   const soldCount = players.filter((p) => p.status === "sold").length;
-  const teamCount = teamsRes.count ?? 0;
+  const teamCount = teamRows.length;
   const playerCount = players.length;
 
   const periodLabel =
@@ -60,21 +66,14 @@ export default async function OrganizerDashboardPage({
     <div className="space-y-8">
       <PageHeader
         title="Dashboard"
-        description={`Welcome back, ${profile.full_name || profile.email}. Overview for ${periodLabel.toLowerCase()}.`}
+        description={`Overview for ${periodLabel.toLowerCase()}.`}
         action={<DashboardDateFilter from={from} to={to} />}
       />
 
-      <Card className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <p className="text-xs font-bold uppercase tracking-wider text-[var(--accent-foreground)]">Your events</p>
-          <p className="mt-1 text-sm text-[var(--muted)]">
-            Open a tournament to add teams, run the auction, and track finance.
-          </p>
-        </div>
-        <Link href="/organizer/tournaments">
-          <Button className="w-full sm:w-auto">Go to tournaments</Button>
-        </Link>
-      </Card>
+      <DashboardHero
+        profile={{ full_name: profile.full_name, email: profile.email }}
+        tournaments={tournaments.map((t) => ({ id: t.id, name: t.name, status: t.status }))}
+      />
 
       <section className="space-y-3">
         <p className="text-xs font-bold uppercase tracking-wider text-[var(--accent-foreground)]">At a glance</p>

@@ -10,6 +10,11 @@ import {
   teamPurseRemaining,
   toRosterPlayer,
 } from "@/lib/team-roster";
+import {
+  fetchOrganizerPlayerRosterBits,
+  fetchOrganizerPlayers,
+  fetchOrganizerTeams,
+} from "@/lib/organizer-queries";
 import { requireOrganizer } from "@/utils/supabase/utility/auth";
 
 export default async function TeamDetailViewPage({
@@ -28,25 +33,15 @@ export default async function TeamDetailViewPage({
 
   if (!tournament) notFound();
 
-  const { data: team } = await supabase
-    .from("teams")
-    .select("*")
-    .eq("id", teamId)
-    .eq("tournament_id", tournamentId)
-    .single();
-
+  const [teams, allPlayerRows] = await Promise.all([
+    fetchOrganizerTeams(supabase, tournamentId),
+    fetchOrganizerPlayers(supabase, tournamentId),
+  ]);
+  const team = teams.find((t) => t.id === teamId);
   if (!team) notFound();
 
-  const [{ data: squadPlayers }, { data: allPlayers }, { data: teams }] = await Promise.all([
-    supabase
-      .from("players")
-      .select("*")
-      .eq("tournament_id", tournamentId)
-      .eq("team_id", teamId)
-      .order("player_code"),
-    supabase.from("players").select("team_id, sold_price").eq("tournament_id", tournamentId),
-    supabase.from("teams").select("*").eq("tournament_id", tournamentId).order("name"),
-  ]);
+  const squadPlayers = allPlayerRows.filter((p) => p.team_id === teamId);
+  const allPlayers = await fetchOrganizerPlayerRosterBits(supabase, tournamentId);
 
   const squadReturnTo = `/organizer/tournaments/${tournamentId}/team-view/${teamId}`;
 

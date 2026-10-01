@@ -35,9 +35,10 @@ export default async function AdminTournamentsPage() {
   }
 
   const rows = (tournaments ?? []).map((t) => {
-    const assigned =
-      assignedByTournament.get(t.id) ??
-      (t.organizer_id ? [{ profile_id: t.organizer_id, can_delete_ledger: false }] : []);
+    const assigned = [...(assignedByTournament.get(t.id) ?? [])];
+    if (t.organizer_id && !assigned.some((a) => a.profile_id === t.organizer_id)) {
+      assigned.unshift({ profile_id: t.organizer_id, can_delete_ledger: true });
+    }
     const labels = assigned.map(({ profile_id: id }) => {
       const org = organizerById.get(id);
       if (!org) return "Unknown";

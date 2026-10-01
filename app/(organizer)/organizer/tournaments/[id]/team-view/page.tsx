@@ -13,6 +13,7 @@ import {
   toRosterPlayer,
 } from "@/lib/team-roster";
 import { notFound } from "next/navigation";
+import { fetchOrganizerPlayers, fetchOrganizerTeams } from "@/lib/organizer-queries";
 import { requireOrganizer } from "@/utils/supabase/utility/auth";
 
 export default async function TeamViewPage({ params }: { params: Promise<{ id: string }> }) {
@@ -27,12 +28,12 @@ export default async function TeamViewPage({ params }: { params: Promise<{ id: s
 
   if (!tournament) notFound();
 
-  const [{ data: teams }, { data: players }] = await Promise.all([
-    supabase.from("teams").select("*").eq("tournament_id", tournamentId).order("name"),
-    supabase.from("players").select("*").eq("tournament_id", tournamentId).order("player_code"),
+  const [teams, players] = await Promise.all([
+    fetchOrganizerTeams(supabase, tournamentId),
+    fetchOrganizerPlayers(supabase, tournamentId),
   ]);
 
-  const allRosters = buildAllTeamRosters(tournament.name, teams ?? [], players ?? []);
+  const allRosters = buildAllTeamRosters(tournament.name, teams, players);
 
   return (
     <div className="space-y-6">

@@ -2,6 +2,7 @@ import { Card } from "@/components/ui/card";
 import { TournamentSetupGuide } from "@/components/tournament-setup-guide";
 import { TournamentStatusControl } from "@/components/tournament-status-control";
 import { notFound } from "next/navigation";
+import { fetchOrganizerPlayers, fetchOrganizerTeams } from "@/lib/organizer-queries";
 import { requireOrganizer } from "@/utils/supabase/utility/auth";
 
 export default async function TournamentOverviewPage({
@@ -14,13 +15,13 @@ export default async function TournamentOverviewPage({
   const { data: tournament } = await supabase.from("tournaments").select("*").eq("id", id).maybeSingle();
   if (!tournament) notFound();
 
-  const [{ count: teamCount }, { count: playerCount }] = await Promise.all([
-    supabase.from("teams").select("*", { count: "exact", head: true }).eq("tournament_id", id),
-    supabase.from("players").select("*", { count: "exact", head: true }).eq("tournament_id", id),
+  const [teamRows, playerRows] = await Promise.all([
+    fetchOrganizerTeams(supabase, id),
+    fetchOrganizerPlayers(supabase, id),
   ]);
 
-  const teams = teamCount ?? 0;
-  const players = playerCount ?? 0;
+  const teams = teamRows.length;
+  const players = playerRows.length;
 
   return (
     <div className="space-y-6">

@@ -6,11 +6,14 @@ import { requireSuperAdmin } from "@/utils/supabase/utility/auth";
 export default async function OrganizersPage() {
   await requireSuperAdmin();
   const admin = createAdminClient();
-  const { data: organizers, error } = await admin
-    .from("profiles")
-    .select("*")
-    .eq("role", "organizer")
-    .order("created_at", { ascending: false });
+  const [{ data: organizers, error }, { data: tournaments }] = await Promise.all([
+    admin
+      .from("profiles")
+      .select("*")
+      .eq("role", "organizer")
+      .order("created_at", { ascending: false }),
+    admin.from("tournaments").select("id, name, status").order("name"),
+  ]);
 
   if (error) {
     throw new Error(error.message);
@@ -18,8 +21,11 @@ export default async function OrganizersPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Organizer management" description="List first — use + Create to add accounts." />
-      <AdminOrganizersManager organizers={organizers ?? []} />
+      <PageHeader
+        title="Organizer management"
+        description="New accounts do not inherit tournaments automatically — assign the event where teams already exist."
+      />
+      <AdminOrganizersManager organizers={organizers ?? []} tournaments={tournaments ?? []} />
     </div>
   );
 }

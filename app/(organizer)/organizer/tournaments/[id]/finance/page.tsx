@@ -1,14 +1,15 @@
 import { FinanceManager } from "@/components/finance-manager";
 import { isAuctionLedgerEntry } from "@/lib/ledger";
 import { getCanDeleteLedgerForTournament } from "@/lib/tournament-organizer";
+import { fetchOrganizerTeams } from "@/lib/organizer-queries";
 import { requireOrganizer } from "@/utils/supabase/utility/auth";
 
 export default async function FinancePage({ params }: { params: Promise<{ id: string }> }) {
   const { supabase, profile } = await requireOrganizer();
   const { id: tournamentId } = await params;
 
-  const [{ data: teams }, { data: ledger }, { data: history }] = await Promise.all([
-    supabase.from("teams").select("*").eq("tournament_id", tournamentId).order("name"),
+  const [teams, { data: ledger }, { data: history }] = await Promise.all([
+    fetchOrganizerTeams(supabase, tournamentId),
     supabase
       .from("financial_ledger")
       .select(
@@ -56,7 +57,7 @@ export default async function FinancePage({ params }: { params: Promise<{ id: st
   return (
     <FinanceManager
       tournamentId={tournamentId}
-      teams={teams ?? []}
+      teams={teams}
       ledger={financeLedger}
       historyByLedgerId={historyByLedgerId}
       canDeleteLedger={canDeleteLedger}

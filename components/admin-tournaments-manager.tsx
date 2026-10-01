@@ -4,6 +4,7 @@ import { useState } from "react";
 import {
   assignTournamentOrganizer,
   createTournament,
+  repairTournamentOrganizerAccess,
   removeTournamentOrganizer,
   setTournamentOrganizerCanDeleteLedger,
 } from "@/app/actions/admin";
@@ -176,7 +177,7 @@ export function AdminTournamentsManager({
         title="Tournament organizers"
         description={
           manageTournament
-            ? `Add or remove organizers for “${manageTournament.name}”. Adding someone does not remove others.`
+            ? `Add or remove organizers for “${manageTournament.name}”. Once added, they automatically see teams, players, auction, and finance for this event.`
             : undefined
         }
       >
@@ -225,6 +226,16 @@ export function AdminTournamentsManager({
                 </li>
               ))}
             </ul>
+
+            <form action={repairTournamentOrganizerAccess} className="border-t border-[var(--border-subtle)] pt-4">
+              <input type="hidden" name="tournament_id" value={manageTournament.id} />
+              <p className="text-xs text-[var(--muted)]">
+                If a primary organizer cannot see teams, sync their junction access from the tournament record.
+              </p>
+              <SubmitButton variant="secondary" className="mt-2 w-full sm:w-auto" pendingLabel="Syncing…">
+                Repair organizer access
+              </SubmitButton>
+            </form>
 
             {manageTournament.assignedOrganizers.length < organizers.length ? (
               <form

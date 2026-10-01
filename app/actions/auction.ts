@@ -78,7 +78,7 @@ export async function assignPlayerSale(tournamentId: string, formData: FormData)
   try {
     const { supabase, profile } = await getSupabase();
     const linkErr = await ensureMyTournamentOrganizer(supabase, tournamentId);
-    if (linkErr) redirectWithFlash(path, "error", linkErr.message);
+    if (linkErr) redirectWithFlash(path, "error", linkErr);
 
     const playerId = String(formData.get("player_id") ?? "");
     const teamId = String(formData.get("team_id") ?? "");

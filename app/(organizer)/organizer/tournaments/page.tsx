@@ -2,14 +2,12 @@ import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
 import { TournamentListItem } from "@/components/tournament-list-item";
 import { Card } from "@/components/ui/card";
+import { fetchOrganizerTournaments } from "@/lib/organizer-queries";
 import { requireOrganizer } from "@/utils/supabase/utility/auth";
 
 export default async function TournamentsPage() {
   const { supabase } = await requireOrganizer();
-  const { data: tournaments } = await supabase
-    .from("tournaments")
-    .select("*")
-    .order("created_at", { ascending: false });
+  const tournaments = await fetchOrganizerTournaments(supabase);
 
   return (
     <div className="space-y-8">

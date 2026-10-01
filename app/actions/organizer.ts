@@ -33,7 +33,7 @@ async function prepareTournamentWrite(
   path: string
 ) {
   const err = await ensureMyTournamentOrganizer(supabase, tournamentId);
-  if (err) redirectWithFlash(path, "error", err.message);
+  if (err) redirectWithFlash(path, "error", err);
 }
 
 export async function updateTournamentStatus(tournamentId: string, formData: FormData) {

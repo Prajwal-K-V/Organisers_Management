@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Field, FieldGroup } from "@/components/ui/field";
 import { notFound } from "next/navigation";
 import { teamPurseRemaining } from "@/lib/team-roster";
+import { fetchOrganizerPlayerRosterBits, fetchOrganizerPlayers, fetchOrganizerTeams } from "@/lib/organizer-queries";
 import { requireOrganizer } from "@/utils/supabase/utility/auth";
 
 export default async function AuctionPage({ params }: { params: Promise<{ id: string }> }) {
@@ -21,18 +22,14 @@ export default async function AuctionPage({ params }: { params: Promise<{ id: st
 
   if (!tournament) notFound();
 
-  const [{ data: teams }, { data: players }, { data: pursePlayers }] = await Promise.all([
-    supabase.from("teams").select("*").eq("tournament_id", tournamentId).order("name"),
-    supabase
-      .from("players")
-      .select("*")
-      .eq("tournament_id", tournamentId)
-      .in("status", ["available", "unsold"])
-      .order("player_code"),
-    supabase.from("players").select("team_id, sold_price").eq("tournament_id", tournamentId),
+  const [teams, allPlayers, pursePlayers] = await Promise.all([
+    fetchOrganizerTeams(supabase, tournamentId),
+    fetchOrganizerPlayers(supabase, tournamentId),
+    fetchOrganizerPlayerRosterBits(supabase, tournamentId),
   ]);
+  const players = allPlayers.filter((p) => p.status === "available" || p.status === "unsold");
 
-  if (!teams?.length || !players?.length) {
+  if (!teams.length || !players.length) {
     return (
       <Card>
         <EmptyState

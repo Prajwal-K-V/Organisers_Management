@@ -10,6 +10,7 @@ import {
 } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { Spinner } from "@/components/spinner";
+import { cn } from "@/lib/utils";
 
 type PendingContextValue = {
   startNavigation: () => void;
@@ -69,7 +70,14 @@ export function PendingProvider({ children }: { children: ReactNode }) {
           </div>
         </div>
       ) : null}
-      {children}
+      <div
+        className={cn(
+          "min-h-0 flex-1 transition-[opacity,transform] duration-200 ease-out",
+          busy && "pointer-events-none opacity-70 scale-[0.998]"
+        )}
+      >
+        {children}
+      </div>
     </PendingContext.Provider>
   );
 }

@@ -328,6 +328,22 @@ export type Database = {
         };
         Returns: undefined;
       };
+      organizer_my_tournaments: {
+        Args: Record<string, never>;
+        Returns: Tournament[];
+      };
+      organizer_tournament_teams: {
+        Args: { p_tournament_id: string };
+        Returns: Team[];
+      };
+      organizer_tournament_players: {
+        Args: { p_tournament_id: string };
+        Returns: Player[];
+      };
+      organizer_tournament_access: {
+        Args: { p_tournament_id: string };
+        Returns: boolean;
+      };
     };
     Enums: {
       user_role: UserRole;

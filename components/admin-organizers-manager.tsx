@@ -12,9 +12,15 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Field, FieldGroup } from "@/components/ui/field";
 import { Modal } from "@/components/ui/modal";
-import type { Profile } from "@/types/database";
+import type { Profile, Tournament } from "@/types/database";
 
-export function AdminOrganizersManager({ organizers }: { organizers: Profile[] }) {
+export function AdminOrganizersManager({
+  organizers,
+  tournaments,
+}: {
+  organizers: Profile[];
+  tournaments: Pick<Tournament, "id" | "name" | "status">[];
+}) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -102,6 +108,32 @@ export function AdminOrganizersManager({ organizers }: { organizers: Profile[] }
             <Field label="Full name" name="full_name" placeholder="Jane Doe" />
             <Field label="Email" name="email" type="email" required placeholder="organizer@club.com" />
             <Field label="Temporary password" name="password" type="password" required placeholder="Min. 8 characters" hint="Share securely" />
+            {tournaments.length ? (
+              <>
+                <label className="flex flex-col gap-1.5 text-sm">
+                  <span className="font-medium">Tournament access (optional)</span>
+                  <select
+                    name="tournament_id"
+                    className="rounded-lg border-2 border-[var(--border-subtle)] bg-white px-3 py-2.5 text-sm"
+                    defaultValue=""
+                  >
+                    <option value="">No tournament yet</option>
+                    {tournaments.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name} ({t.status})
+                      </option>
+                    ))}
+                  </select>
+                  <span className="text-xs text-[var(--muted)]">
+                    Pick the event that already has teams, or they will see an empty list until you assign them.
+                  </span>
+                </label>
+                <label className="flex items-center gap-2 text-sm">
+                  <input type="checkbox" name="set_primary" value="true" className="size-4 rounded border-stone-300" />
+                  <span>Set as primary organizer for that tournament</span>
+                </label>
+              </>
+            ) : null}
           </FieldGroup>
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <Button type="button" variant="secondary" onClick={() => setOpen(false)}>Cancel</Button>
