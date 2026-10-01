@@ -20,6 +20,13 @@ export type Profile = {
   updated_at: string;
 };
 
+export type TournamentOrganizer = {
+  tournament_id: string;
+  profile_id: string;
+  can_delete_ledger: boolean;
+  created_at: string;
+};
+
 export type Tournament = {
   id: string;
   organizer_id: string;
@@ -91,6 +98,28 @@ export type FinancialLedgerEntry = {
   created_at: string;
 };
 
+export type LedgerCreator = Pick<Profile, "full_name" | "email">;
+
+export type FinancialLedgerEntryWithCreator = FinancialLedgerEntry & {
+  creator: LedgerCreator | null;
+};
+
+export type FinancialLedgerHistoryEntry = {
+  id: string;
+  ledger_id: string;
+  tournament_id: string;
+  team_id: string | null;
+  entry_type: LedgerEntryType;
+  amount: number;
+  description: string | null;
+  changed_by: string | null;
+  changed_at: string;
+};
+
+export type FinancialLedgerHistoryWithEditor = FinancialLedgerHistoryEntry & {
+  editor: LedgerCreator | null;
+};
+
 type Tables = {
   profiles: {
     Row: Profile;
@@ -129,6 +158,17 @@ type Tables = {
       updated_at?: string;
     };
     Update: Partial<Tables["tournaments"]["Insert"]>;
+    Relationships: [];
+  };
+  tournament_organizers: {
+    Row: TournamentOrganizer;
+    Insert: {
+      tournament_id: string;
+      profile_id: string;
+      can_delete_ledger?: boolean;
+      created_at?: string;
+    };
+    Update: Partial<Tables["tournament_organizers"]["Insert"]>;
     Relationships: [];
   };
   teams: {
@@ -215,7 +255,39 @@ type Tables = {
       created_at?: string;
     };
     Update: Partial<Tables["financial_ledger"]["Insert"]>;
-    Relationships: [];
+    Relationships: [
+      {
+        foreignKeyName: "financial_ledger_created_by_fkey";
+        columns: ["created_by"];
+        isOneToOne: false;
+        referencedRelation: "profiles";
+        referencedColumns: ["id"];
+      },
+    ];
+  };
+  financial_ledger_history: {
+    Row: FinancialLedgerHistoryEntry;
+    Insert: {
+      id?: string;
+      ledger_id: string;
+      tournament_id: string;
+      team_id?: string | null;
+      entry_type: LedgerEntryType;
+      amount: number;
+      description?: string | null;
+      changed_by?: string | null;
+      changed_at?: string;
+    };
+    Update: Partial<Tables["financial_ledger_history"]["Insert"]>;
+    Relationships: [
+      {
+        foreignKeyName: "financial_ledger_history_changed_by_fkey";
+        columns: ["changed_by"];
+        isOneToOne: false;
+        referencedRelation: "profiles";
+        referencedColumns: ["id"];
+      },
+    ];
   };
 };
 
@@ -242,6 +314,19 @@ export type Database = {
       ensure_profile: {
         Args: Record<string, never>;
         Returns: Profile;
+      };
+      ensure_my_tournament_organizer: {
+        Args: { p_tournament_id: string };
+        Returns: boolean;
+      };
+      assign_player_sale: {
+        Args: {
+          p_tournament_id: string;
+          p_player_id: string;
+          p_team_id: string;
+          p_amount: number;
+        };
+        Returns: undefined;
       };
     };
     Enums: {

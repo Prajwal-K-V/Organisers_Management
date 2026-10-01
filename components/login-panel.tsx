@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { signInWithMagicLink, signInWithPassword } from "@/app/actions/auth";
 import { SubmitButton } from "@/components/submit-button";
@@ -49,6 +50,11 @@ export function LoginPanel() {
             required
             placeholder="••••••••"
           />
+          <p className="text-right text-sm">
+            <Link href="/login/forgot-password" className="font-semibold text-[var(--primary)] hover:underline">
+              Forgot password?
+            </Link>
+          </p>
           <SubmitButton className="w-full" pendingLabel="Signing in…">
             Sign in
           </SubmitButton>

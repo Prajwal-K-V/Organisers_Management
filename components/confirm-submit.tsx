@@ -27,6 +27,6 @@ export function ConfirmSubmit({
   );
 }
 
-export function ConfirmDeleteButton({ label = "Delete" }: { label?: string }) {
-  return <SubmitButton variant="danger">{label}</SubmitButton>;
+export function ConfirmDeleteButton({ label = "Delete", className }: { label?: string; className?: string }) {
+  return <SubmitButton variant="danger" className={className}>{label}</SubmitButton>;
 }

@@ -1,7 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { assignTournamentOrganizer, createTournament } from "@/app/actions/admin";
+import {
+  assignTournamentOrganizer,
+  createTournament,
+  removeTournamentOrganizer,
+  setTournamentOrganizerCanDeleteLedger,
+} from "@/app/actions/admin";
 import { EmptyState } from "@/components/empty-state";
 import { ListToolbar } from "@/components/list-toolbar";
 import { SubmitButton } from "@/components/submit-button";
@@ -13,19 +18,22 @@ import { Field } from "@/components/ui/field";
 import { Modal } from "@/components/ui/modal";
 import type { Profile, Tournament } from "@/types/database";
 
-type Row = Tournament & { organizerLabel: string };
+type AssignedOrganizer = { profile_id: string; can_delete_ledger: boolean };
+
+type Row = Tournament & { organizerLabel: string; assignedOrganizers: AssignedOrganizer[] };
 
 function OrganizerSelect({
   organizers,
   name = "organizer_id",
-  defaultValue = "",
+  excludeIds = [],
   required = true,
 }: {
   organizers: Pick<Profile, "id" | "full_name" | "email">[];
   name?: string;
-  defaultValue?: string;
+  excludeIds?: string[];
   required?: boolean;
 }) {
+  const options = organizers.filter((o) => !excludeIds.includes(o.id));
   return (
     <label className="flex flex-col gap-1.5 text-sm">
       <span className="font-medium">Organizer</span>
@@ -33,10 +41,10 @@ function OrganizerSelect({
         name={name}
         required={required}
         className="rounded-lg border-2 border-[var(--border-subtle)] bg-white px-3 py-2.5 text-sm"
-        defaultValue={defaultValue || ""}
+        defaultValue=""
       >
         <option value="" disabled>Select organizer</option>
-        {organizers.map((o) => (
+        {options.map((o) => (
           <option key={o.id} value={o.id}>{o.full_name || o.email}</option>
         ))}
       </select>
@@ -52,8 +60,13 @@ export function AdminTournamentsManager({
   organizers: Pick<Profile, "id" | "full_name" | "email">[];
 }) {
   const [createOpen, setCreateOpen] = useState(false);
-  const [assignTournament, setAssignTournament] = useState<Row | null>(null);
+  const [manageTournament, setManageTournament] = useState<Row | null>(null);
   const canAssign = organizers.length > 0;
+
+  const organizerName = (id: string) => {
+    const o = organizers.find((x) => x.id === id);
+    return o ? o.full_name || o.email : "Unknown";
+  };
 
   return (
     <div className="space-y-4">
@@ -92,9 +105,9 @@ export function AdminTournamentsManager({
                     variant="secondary"
                     className="w-full"
                     disabled={!canAssign}
-                    onClick={() => setAssignTournament(t)}
+                    onClick={() => setManageTournament(t)}
                   >
-                    Assign organizer
+                    Manage organizers
                   </Button>
                 </Card>
               </li>
@@ -106,7 +119,7 @@ export function AdminTournamentsManager({
                 <thead>
                   <tr>
                     <th>Name</th>
-                    <th>Organizer</th>
+                    <th>Organizers</th>
                     <th>Status</th>
                     <th />
                   </tr>
@@ -123,9 +136,9 @@ export function AdminTournamentsManager({
                           variant="secondary"
                           className="text-xs"
                           disabled={!canAssign}
-                          onClick={() => setAssignTournament(t)}
+                          onClick={() => setManageTournament(t)}
                         >
-                          Assign
+                          Manage
                         </Button>
                       </td>
                     </tr>
@@ -147,7 +160,7 @@ export function AdminTournamentsManager({
           <p className="text-sm text-[var(--muted)]">Activate an organizer before creating tournaments.</p>
         ) : (
           <form action={createTournament} className="space-y-4" onSubmit={() => setCreateOpen(false)}>
-            <Field label="Tournament name" name="name" required placeholder="Ratyotsava Cup 2026" />
+            <Field label="Tournament name" name="name" required placeholder="Rajyotsava Cup 2026" />
             <OrganizerSelect organizers={organizers} />
             <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
               <Button type="button" variant="secondary" onClick={() => setCreateOpen(false)}>Cancel</Button>
@@ -158,26 +171,82 @@ export function AdminTournamentsManager({
       </Modal>
 
       <Modal
-        open={assignTournament !== null}
-        onClose={() => setAssignTournament(null)}
-        title="Assign organizer"
-        description={assignTournament ? `Who should run “${assignTournament.name}”?` : undefined}
+        open={manageTournament !== null}
+        onClose={() => setManageTournament(null)}
+        title="Tournament organizers"
+        description={
+          manageTournament
+            ? `Add or remove organizers for “${manageTournament.name}”. Adding someone does not remove others.`
+            : undefined
+        }
       >
-        {!canAssign || !assignTournament ? (
+        {!canAssign || !manageTournament ? (
           <p className="text-sm text-[var(--muted)]">No active organizers available.</p>
         ) : (
-          <form
-            action={assignTournamentOrganizer}
-            className="space-y-4"
-            onSubmit={() => setAssignTournament(null)}
-          >
-            <input type="hidden" name="tournament_id" value={assignTournament.id} />
-            <OrganizerSelect organizers={organizers} defaultValue={assignTournament.organizer_id} />
-            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-              <Button type="button" variant="secondary" onClick={() => setAssignTournament(null)}>Cancel</Button>
-              <SubmitButton pendingLabel="Saving…">Save assignment</SubmitButton>
-            </div>
-          </form>
+          <div className="space-y-6">
+            <ul className="space-y-2">
+              {manageTournament.assignedOrganizers.map((assignment) => (
+                <li
+                  key={assignment.profile_id}
+                  className="space-y-2 rounded-lg border border-[var(--border-subtle)] px-3 py-2"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-sm font-medium">{organizerName(assignment.profile_id)}</span>
+                    <form action={removeTournamentOrganizer}>
+                      <input type="hidden" name="tournament_id" value={manageTournament.id} />
+                      <input type="hidden" name="organizer_id" value={assignment.profile_id} />
+                      <SubmitButton
+                        variant="secondary"
+                        className="text-xs"
+                        pendingLabel="Removing…"
+                        disabled={manageTournament.assignedOrganizers.length <= 1}
+                      >
+                        Remove
+                      </SubmitButton>
+                    </form>
+                  </div>
+                  <form action={setTournamentOrganizerCanDeleteLedger} className="flex items-center justify-between gap-2">
+                    <input type="hidden" name="tournament_id" value={manageTournament.id} />
+                    <input type="hidden" name="organizer_id" value={assignment.profile_id} />
+                    <input
+                      type="hidden"
+                      name="can_delete_ledger"
+                      value={assignment.can_delete_ledger ? "false" : "true"}
+                    />
+                    <p className="text-xs text-[var(--muted)]">
+                      {assignment.can_delete_ledger
+                        ? "Can delete ledger entries"
+                        : "Cannot delete ledger entries"}
+                    </p>
+                    <SubmitButton variant="secondary" className="text-xs" pendingLabel="Saving…">
+                      {assignment.can_delete_ledger ? "Revoke delete" : "Allow delete"}
+                    </SubmitButton>
+                  </form>
+                </li>
+              ))}
+            </ul>
+
+            {manageTournament.assignedOrganizers.length < organizers.length ? (
+              <form
+                action={assignTournamentOrganizer}
+                className="space-y-4 border-t border-[var(--border-subtle)] pt-4"
+              >
+                <input type="hidden" name="tournament_id" value={manageTournament.id} />
+                <OrganizerSelect
+                  organizers={organizers}
+                  excludeIds={manageTournament.assignedOrganizers.map((a) => a.profile_id)}
+                />
+                <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                  <Button type="button" variant="secondary" onClick={() => setManageTournament(null)}>
+                    Close
+                  </Button>
+                  <SubmitButton pendingLabel="Adding…">Add organizer</SubmitButton>
+                </div>
+              </form>
+            ) : (
+              <p className="text-sm text-[var(--muted)]">All active organizers are already on this tournament.</p>
+            )}
+          </div>
         )}
       </Modal>
     </div>

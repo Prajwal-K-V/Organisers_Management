@@ -8,12 +8,17 @@ import { getSessionProfile } from "@/utils/supabase/utility/profile";
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
+  const next = searchParams.get("next");
 
   if (code) {
     const cookieStore = await cookies();
     const supabase = createClient(cookieStore);
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error) {
+      if (next === "/auth/update-password") {
+        return NextResponse.redirect(`${origin}/auth/update-password`);
+      }
+
       const { profile, errorMessage } = await getSessionProfile(supabase);
       if (profile) {
         if (profile.role === "organizer" && !profile.is_active) {

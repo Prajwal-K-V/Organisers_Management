@@ -9,7 +9,7 @@
   --muted: #78716c;
   --muted-bg: #fef3c7;
   --border: #fcd34d;
-  --border-subtle: #fde68a;
+  --border-subtle: #e7e5e4;
   --primary: #b91c1c;
   --primary-hover: #991b1b;
   --primary-foreground: #ffffff;
@@ -82,10 +82,10 @@ body {
 }
 
 .data-table thead tr {
-  border-bottom: 2px solid var(--border-subtle);
+  border-bottom: 1px solid var(--border-subtle);
   text-align: left;
-  color: var(--accent-foreground);
-  background: linear-gradient(180deg, var(--accent-soft) 0%, #fffbeb 100%);
+  color: var(--muted);
+  background: #fafaf9;
 }
 
 .data-table th {

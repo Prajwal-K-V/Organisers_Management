@@ -41,7 +41,15 @@ export async function updateSession(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   const isPublic =
     pathname === "/login" ||
+    pathname === "/login/forgot-password" ||
     pathname.startsWith("/auth/callback");
+
+  if (pathname === "/auth/update-password") {
+    if (!user) {
+      return redirectWithCookies(new URL("/login", request.url), supabaseResponse);
+    }
+    return supabaseResponse;
+  }
 
   let role: UserRole | null = null;
   let isActive = false;

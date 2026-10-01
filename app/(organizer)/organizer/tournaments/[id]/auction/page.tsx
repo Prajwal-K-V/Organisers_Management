@@ -5,24 +5,21 @@ import { SubmitButton } from "@/components/submit-button";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Field, FieldGroup } from "@/components/ui/field";
-import { createClient } from "@/utils/supabase/server";
-import { cookies } from "next/headers";
+import { notFound } from "next/navigation";
 import { teamPurseRemaining } from "@/lib/team-roster";
 import { requireOrganizer } from "@/utils/supabase/utility/auth";
 
 export default async function AuctionPage({ params }: { params: Promise<{ id: string }> }) {
-  const { profile } = await requireOrganizer();
+  const { supabase } = await requireOrganizer();
   const { id: tournamentId } = await params;
-  const supabase = createClient(await cookies());
 
   const { data: tournament } = await supabase
     .from("tournaments")
     .select("id")
     .eq("id", tournamentId)
-    .eq("organizer_id", profile.id)
-    .single();
+    .maybeSingle();
 
-  if (!tournament) return null;
+  if (!tournament) notFound();
 
   const [{ data: teams }, { data: players }, { data: pursePlayers }] = await Promise.all([
     supabase.from("teams").select("*").eq("tournament_id", tournamentId).order("name"),

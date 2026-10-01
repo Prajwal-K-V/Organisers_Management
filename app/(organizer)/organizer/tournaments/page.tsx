@@ -2,24 +2,20 @@ import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
 import { TournamentListItem } from "@/components/tournament-list-item";
 import { Card } from "@/components/ui/card";
-import { createClient } from "@/utils/supabase/server";
-import { cookies } from "next/headers";
 import { requireOrganizer } from "@/utils/supabase/utility/auth";
 
 export default async function TournamentsPage() {
-  const { profile } = await requireOrganizer();
-  const supabase = createClient(await cookies());
+  const { supabase } = await requireOrganizer();
   const { data: tournaments } = await supabase
     .from("tournaments")
     .select("*")
-    .eq("organizer_id", profile.id)
     .order("created_at", { ascending: false });
 
   return (
     <div className="space-y-8">
       <PageHeader
         title="Tournaments"
-        description="Select a tournament below to manage teams, players, auction, and finance."
+        description="New tournaments start as draft. Open one → Overview → Publish tournament when you are ready to go live."
       />
 
       {!tournaments?.length ? (

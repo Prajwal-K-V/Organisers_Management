@@ -6,8 +6,6 @@ import { TournamentListItem } from "@/components/tournament-list-item";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { formatCredits, sumLedgerFlows } from "@/lib/dashboard-finance";
-import { createClient } from "@/utils/supabase/server";
-import { cookies } from "next/headers";
 import { requireOrganizer } from "@/utils/supabase/utility/auth";
 
 function endOfDayIso(date: string) {
@@ -19,14 +17,12 @@ export default async function OrganizerDashboardPage({
 }: {
   searchParams: Promise<{ from?: string; to?: string }>;
 }) {
-  const { profile } = await requireOrganizer();
+  const { supabase, profile } = await requireOrganizer();
   const { from, to } = await searchParams;
-  const supabase = createClient(await cookies());
 
   const { data: tournaments } = await supabase
     .from("tournaments")
     .select("id, name, status, created_at")
-    .eq("organizer_id", profile.id)
     .order("created_at", { ascending: false });
 
   const tournamentIds = (tournaments ?? []).map((t) => t.id);
@@ -37,7 +33,8 @@ export default async function OrganizerDashboardPage({
       let q = supabase
         .from("financial_ledger")
         .select("entry_type, amount, created_at, description, tournament_id")
-        .in("tournament_id", tournamentIds);
+        .in("tournament_id", tournamentIds)
+        .neq("entry_type", "bid");
       if (from) q = q.gte("created_at", from);
       if (to) q = q.lte("created_at", endOfDayIso(to));
       return q;
@@ -112,7 +109,7 @@ export default async function OrganizerDashboardPage({
             </div>
           </dl>
           <p className="text-xs text-[var(--muted)]">
-            Includes opening balance, income, expenses, auction sales, refunds, and adjustments. Use tournament Finance for
+            Manual tournament cash flow only (income, expenses, adjustments). Player auction points stay on teams. Use Finance for
             per-event detail.
           </p>
         </Card>

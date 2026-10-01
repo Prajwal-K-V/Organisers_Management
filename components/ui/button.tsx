@@ -12,7 +12,7 @@ export function Button({ variant = "primary", className = "", ...props }: Props)
     primary:
       "bg-[var(--primary)] text-[var(--primary-foreground)] shadow-sm hover:bg-[var(--primary-hover)]",
     secondary:
-      "border-2 border-[var(--border-subtle)] bg-white text-[var(--accent-foreground)] hover:bg-[var(--accent-soft)]",
+      "border border-stone-200 bg-white text-stone-700 shadow-sm hover:bg-stone-50",
     danger: "bg-[var(--danger)] text-white hover:bg-[#b91c1c]",
     ghost: "text-[var(--muted)] hover:bg-[var(--accent-soft)] hover:text-[var(--foreground)]",
   };

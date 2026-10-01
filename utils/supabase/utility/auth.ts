@@ -36,8 +36,12 @@ export async function getProfile(): Promise<Profile | null> {
   return profile;
 }
 
-export async function requireSuperAdmin(): Promise<{ user: User; profile: Profile }> {
-  const { user, profile } = await getRequestAuth();
+export async function requireSuperAdmin(): Promise<{
+  user: User;
+  profile: Profile;
+  supabase: SupabaseClient<Database>;
+}> {
+  const { user, profile, supabase } = await getRequestAuth();
 
   if (!user) redirect("/login");
 
@@ -45,10 +49,14 @@ export async function requireSuperAdmin(): Promise<{ user: User; profile: Profil
     redirect("/login?error=forbidden");
   }
 
-  return { user, profile };
+  return { user, profile, supabase };
 }
 
-export async function requireOrganizer(): Promise<{ user: User; profile: Profile }> {
+export async function requireOrganizer(): Promise<{
+  user: User;
+  profile: Profile;
+  supabase: SupabaseClient<Database>;
+}> {
   const { user, profile, supabase } = await getRequestAuth();
 
   if (!user) redirect("/login");
@@ -58,5 +66,5 @@ export async function requireOrganizer(): Promise<{ user: User; profile: Profile
     redirect("/login?error=inactive");
   }
 
-  return { user, profile };
+  return { user, profile, supabase };
 }

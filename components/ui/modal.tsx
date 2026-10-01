@@ -39,7 +39,7 @@ export function Modal({
       <button type="button" className="absolute inset-0 bg-stone-900/50" aria-label="Close dialog" onClick={onClose} />
       <div
         className={cn(
-          "relative z-10 flex max-h-[min(92dvh,640px)] w-full flex-col overflow-hidden rounded-t-2xl border-2 border-[var(--border-subtle)] bg-white shadow-xl sm:max-w-lg sm:rounded-2xl",
+          "relative z-10 flex max-h-[min(92dvh,640px)] w-full flex-col overflow-hidden rounded-t-2xl border border-stone-200 bg-white shadow-2xl sm:max-w-lg sm:rounded-2xl",
           className
         )}
       >

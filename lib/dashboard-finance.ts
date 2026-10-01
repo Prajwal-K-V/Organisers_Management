@@ -17,6 +17,7 @@ export function sumLedgerFlows(rows: LedgerFlowRow[]): FinanceTotals {
   for (const row of rows) {
     const amount = Number(row.amount);
     const type = row.entry_type;
+    if (type === "bid") continue;
 
     switch (type) {
       case "income":
@@ -27,7 +28,6 @@ export function sumLedgerFlows(rows: LedgerFlowRow[]): FinanceTotals {
         income += Math.abs(amount);
         break;
       case "expense":
-      case "bid":
         outgoing += Math.abs(amount);
         break;
       case "adjustment":

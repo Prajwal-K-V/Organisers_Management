@@ -12,23 +12,20 @@ import {
   teamPurseRemaining,
   toRosterPlayer,
 } from "@/lib/team-roster";
-import { createClient } from "@/utils/supabase/server";
-import { cookies } from "next/headers";
+import { notFound } from "next/navigation";
 import { requireOrganizer } from "@/utils/supabase/utility/auth";
 
 export default async function TeamViewPage({ params }: { params: Promise<{ id: string }> }) {
-  const { profile } = await requireOrganizer();
+  const { supabase } = await requireOrganizer();
   const { id: tournamentId } = await params;
-  const supabase = createClient(await cookies());
 
   const { data: tournament } = await supabase
     .from("tournaments")
     .select("id, name")
     .eq("id", tournamentId)
-    .eq("organizer_id", profile.id)
-    .single();
+    .maybeSingle();
 
-  if (!tournament) return null;
+  if (!tournament) notFound();
 
   const [{ data: teams }, { data: players }] = await Promise.all([
     supabase.from("teams").select("*").eq("tournament_id", tournamentId).order("name"),

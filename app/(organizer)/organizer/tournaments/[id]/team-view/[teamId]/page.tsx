@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { TeamRosterPdfButtons } from "@/components/team-roster-pdf-buttons";
-import { TableWrap } from "@/components/table-wrap";
+import { TeamSquadTable } from "@/components/team-squad-table";
 import { Card } from "@/components/ui/card";
 import {
   buildTeamRosterExport,
@@ -10,8 +10,6 @@ import {
   teamPurseRemaining,
   toRosterPlayer,
 } from "@/lib/team-roster";
-import { createClient } from "@/utils/supabase/server";
-import { cookies } from "next/headers";
 import { requireOrganizer } from "@/utils/supabase/utility/auth";
 
 export default async function TeamDetailViewPage({
@@ -19,16 +17,14 @@ export default async function TeamDetailViewPage({
 }: {
   params: Promise<{ id: string; teamId: string }>;
 }) {
-  const { profile } = await requireOrganizer();
+  const { supabase } = await requireOrganizer();
   const { id: tournamentId, teamId } = await params;
-  const supabase = createClient(await cookies());
 
   const { data: tournament } = await supabase
     .from("tournaments")
     .select("id, name")
     .eq("id", tournamentId)
-    .eq("organizer_id", profile.id)
-    .single();
+    .maybeSingle();
 
   if (!tournament) notFound();
 
@@ -41,7 +37,7 @@ export default async function TeamDetailViewPage({
 
   if (!team) notFound();
 
-  const [{ data: squadPlayers }, { data: allPlayers }] = await Promise.all([
+  const [{ data: squadPlayers }, { data: allPlayers }, { data: teams }] = await Promise.all([
     supabase
       .from("players")
       .select("*")
@@ -49,7 +45,10 @@ export default async function TeamDetailViewPage({
       .eq("team_id", teamId)
       .order("player_code"),
     supabase.from("players").select("team_id, sold_price").eq("tournament_id", tournamentId),
+    supabase.from("teams").select("*").eq("tournament_id", tournamentId).order("name"),
   ]);
+
+  const squadReturnTo = `/organizer/tournaments/${tournamentId}/team-view/${teamId}`;
 
   const squad = (squadPlayers ?? []).map(toRosterPlayer);
   const spent = squadSpend(squad);
@@ -98,34 +97,12 @@ export default async function TeamDetailViewPage({
 
       <Card>
         <h3 className="mb-4 font-semibold">Squad</h3>
-        {!squad.length ? (
-          <p className="text-sm text-[var(--muted)]">No players assigned to this team yet.</p>
-        ) : (
-          <TableWrap>
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Code</th>
-                  <th>Name</th>
-                  <th>Role</th>
-                  <th>Base</th>
-                  <th>Sold for</th>
-                </tr>
-              </thead>
-              <tbody>
-                {squad.map((p, i) => (
-                  <tr key={`${p.playerCode}-${i}`}>
-                    <td className="text-[var(--muted)]">{p.playerCode}</td>
-                    <td className="font-medium">{p.name}</td>
-                    <td className="capitalize">{p.role}</td>
-                    <td>{p.basePrice}</td>
-                    <td>{p.soldPrice ?? "—"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </TableWrap>
-        )}
+        <TeamSquadTable
+          tournamentId={tournamentId}
+          players={squadPlayers ?? []}
+          teams={teams ?? []}
+          returnTo={squadReturnTo}
+        />
       </Card>
     </div>
   );

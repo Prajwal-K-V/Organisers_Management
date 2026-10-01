@@ -6,13 +6,20 @@ export function TournamentListItem({
   href,
   name,
   status,
-  hint = "Open tournament hub — teams, players, auction & finance",
+  hint,
 }: {
   href: string;
   name: string;
   status: TournamentStatus;
   hint?: string;
 }) {
+  const defaultHint =
+    status === "draft"
+      ? "Draft — add teams & players, then open Overview and publish to go live"
+      : status === "published"
+        ? "Live — auction and finance are active"
+        : "Completed — open to review teams, players, and finance";
+  const line = hint ?? defaultHint;
   return (
     <Link
       href={href}
@@ -20,7 +27,7 @@ export function TournamentListItem({
     >
       <div className="min-w-0 flex-1">
         <p className="font-semibold text-[var(--foreground)] group-hover:text-[var(--primary)]">{name}</p>
-        <p className="mt-0.5 text-sm text-[var(--muted)]">{hint}</p>
+        <p className="mt-0.5 text-sm text-[var(--muted)]">{line}</p>
         <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-[var(--primary)] opacity-0 transition group-hover:opacity-100">
           Click to continue →
         </p>

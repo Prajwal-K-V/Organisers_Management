@@ -1,8 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { TournamentTabs } from "@/components/tournament-tabs";
-import { createClient } from "@/utils/supabase/server";
-import { cookies } from "next/headers";
 import { requireOrganizer } from "@/utils/supabase/utility/auth";
 
 const tabs = (id: string) => [
@@ -21,15 +19,13 @@ export default async function TournamentLayout({
   children: React.ReactNode;
   params: Promise<{ id: string }>;
 }) {
-  const { profile } = await requireOrganizer();
+  const { supabase } = await requireOrganizer();
   const { id } = await params;
-  const supabase = createClient(await cookies());
   const { data: tournament } = await supabase
     .from("tournaments")
     .select("id, name")
     .eq("id", id)
-    .eq("organizer_id", profile.id)
-    .single();
+    .maybeSingle();
 
   if (!tournament) notFound();
 
@@ -42,9 +38,8 @@ export default async function TournamentLayout({
         ← All tournaments
       </Link>
       <div>
-        <p className="text-xs font-bold uppercase tracking-wider text-[var(--accent-foreground)]">Tournament</p>
-        <h1 className="page-title mt-1">{tournament.name}</h1>
-        <div className="mt-5">
+        <h1 className="page-title">{tournament.name}</h1>
+        <div className="mt-4">
           <TournamentTabs tabs={tabs(id)} />
         </div>
       </div>
