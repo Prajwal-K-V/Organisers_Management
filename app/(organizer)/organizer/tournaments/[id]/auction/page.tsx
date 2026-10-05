@@ -1,13 +1,11 @@
 import Link from "next/link";
-import { assignPlayerSale } from "@/app/actions/auction";
+import { AuctionSalePanel } from "@/components/auction-sale-panel";
 import { EmptyState } from "@/components/empty-state";
-import { SubmitButton } from "@/components/submit-button";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Field, FieldGroup } from "@/components/ui/field";
 import { notFound } from "next/navigation";
+import { fetchOrganizerPlayers, fetchOrganizerTeams } from "@/lib/organizer-queries";
 import { teamPurseRemaining } from "@/lib/team-roster";
-import { fetchOrganizerPlayerRosterBits, fetchOrganizerPlayers, fetchOrganizerTeams } from "@/lib/organizer-queries";
 import { requireOrganizer } from "@/utils/supabase/utility/auth";
 
 export default async function AuctionPage({ params }: { params: Promise<{ id: string }> }) {
@@ -22,12 +20,27 @@ export default async function AuctionPage({ params }: { params: Promise<{ id: st
 
   if (!tournament) notFound();
 
-  const [teams, allPlayers, pursePlayers] = await Promise.all([
+  const [teams, allPlayers] = await Promise.all([
     fetchOrganizerTeams(supabase, tournamentId),
     fetchOrganizerPlayers(supabase, tournamentId),
-    fetchOrganizerPlayerRosterBits(supabase, tournamentId),
   ]);
-  const players = allPlayers.filter((p) => p.status === "available" || p.status === "unsold");
+
+  const rosterBits = allPlayers.map((p) => ({ team_id: p.team_id, sold_price: p.sold_price }));
+  const players = allPlayers
+    .filter((p) => p.status === "available" || p.status === "unsold")
+    .map((p) => ({
+      id: p.id,
+      name: p.name,
+      player_code: p.player_code,
+      base_price: Number(p.base_price),
+      role: p.role,
+    }));
+
+  const teamOptions = teams.map((t) => ({
+    id: t.id,
+    name: t.name,
+    purseRemaining: teamPurseRemaining(t.purse_total, rosterBits, t.id),
+  }));
 
   if (!teams.length || !players.length) {
     return (
@@ -54,53 +67,12 @@ export default async function AuctionPage({ params }: { params: Promise<{ id: st
     <Card className="mx-auto max-w-lg space-y-4">
       <div>
         <h2 className="font-semibold">Auction</h2>
-        <p className="text-sm text-[var(--muted)]">Pick a player, enter points, choose the buying team, then confirm.</p>
+        <p className="text-sm text-[var(--muted)]">
+          Search for a player, enter points, choose the buying team, then confirm.
+        </p>
       </div>
 
-      <form action={assignPlayerSale.bind(null, tournamentId)}>
-        <FieldGroup className="items-stretch">
-          <label className="flex flex-col gap-1.5 text-sm">
-            <span className="font-medium">Player</span>
-            <select
-              name="player_id"
-              required
-              className="rounded-lg border-2 border-[var(--border-subtle)] bg-white px-3 py-2.5 text-sm"
-              defaultValue=""
-            >
-              <option value="" disabled>Select player</option>
-              {players.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.player_code ? `${p.player_code} · ` : ""}
-                  {p.name} (base {p.base_price})
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <Field label="Bid points" name="amount" type="number" min={0} step={1} required placeholder="Amount" />
-
-          <label className="flex flex-col gap-1.5 text-sm">
-            <span className="font-medium">Team</span>
-            <select
-              name="team_id"
-              required
-              className="rounded-lg border-2 border-[var(--border-subtle)] bg-white px-3 py-2.5 text-sm"
-              defaultValue=""
-            >
-              <option value="" disabled>Select team</option>
-              {teams.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name} ({teamPurseRemaining(t.purse_total, pursePlayers ?? [], t.id)} left)
-                </option>
-              ))}
-            </select>
-          </label>
-        </FieldGroup>
-
-        <SubmitButton className="mt-6 w-full" pendingLabel="Saving…">
-          Done
-        </SubmitButton>
-      </form>
+      <AuctionSalePanel tournamentId={tournamentId} players={players} teams={teamOptions} />
     </Card>
   );
 }

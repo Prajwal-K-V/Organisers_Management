@@ -128,7 +128,7 @@ export default async function OrganizerDetailPage({
           </p>
         </div>
         {!assignedTournaments.length ? (
-          <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+          <p className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-950">
             No tournaments assigned yet — this is why Teams looks empty. Link them to the tournament that already has
             teams below.
           </p>

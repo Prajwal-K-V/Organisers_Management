@@ -21,8 +21,8 @@ export function TournamentTabs({ tabs }: { tabs: { href: string; label: string }
             className={cn(
               "shrink-0 whitespace-nowrap rounded-full px-4 py-1.5 text-sm font-semibold transition",
               active
-                ? "bg-[var(--accent)] text-[var(--accent-foreground)] shadow-sm"
-                : "border border-[var(--border-subtle)] bg-white text-stone-600 hover:bg-[var(--accent-soft)]"
+                ? "bg-[var(--primary)] text-white shadow-md shadow-blue-600/15"
+                : "border border-[var(--border-subtle)] bg-white text-slate-600 hover:bg-[var(--accent-soft)]"
             )}
           >
             {tab.label}

@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
+  allocatePlayerCodes,
   buildPlayerInsertRow,
   buildPlayerSoldUpdate,
   formatPlayerCode,
   nextPlayerCodeFromExisting,
   normalizePlayingRole,
+  parseBulkPlayerImport,
 } from "./players";
 
 describe("formatPlayerCode", () => {
@@ -63,5 +65,33 @@ describe("buildPlayerSoldUpdate", () => {
       team_id: "team-1",
       sold_price: 5000,
     });
+  });
+});
+
+describe("parseBulkPlayerImport", () => {
+  it("parses headered CSV rows", () => {
+    const { rows, errors } = parseBulkPlayerImport(
+      "name,role,base_price\nAmit,batsman,100\nRavi,,50\n"
+    );
+    expect(errors).toEqual([]);
+    expect(rows).toEqual([
+      { name: "Amit", role: "batsman", basePrice: 100 },
+      { name: "Ravi", role: "all_rounder", basePrice: 50 },
+    ]);
+  });
+
+  it("reports invalid rows", () => {
+    const { rows, errors } = parseBulkPlayerImport(
+      "name,role,base_price\n,bowler,100\nSam,bowler,not-a-number\n"
+    );
+    expect(rows).toEqual([]);
+    expect(errors.some((e) => e.includes("name"))).toBe(true);
+    expect(errors.some((e) => e.includes("base price"))).toBe(true);
+  });
+});
+
+describe("allocatePlayerCodes", () => {
+  it("returns sequential codes after existing pool", () => {
+    expect(allocatePlayerCodes(["P001", "P008"], 3)).toEqual(["P009", "P010", "P011"]);
   });
 });

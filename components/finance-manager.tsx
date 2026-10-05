@@ -280,6 +280,7 @@ export function FinanceManager({
                         {formatLedgerEntryType(row.entry_type)}
                       </Badge>
                       <span className="text-xs text-[var(--muted)]">{formatLedgerDate(row.created_at)}</span>
+                      <span className="text-xs text-[var(--muted)]">· Added by {profileLabel(row.creator)}</span>
                     </div>
                     <p className="mt-1 truncate text-sm text-stone-800">
                       {row.description?.trim() || "—"}

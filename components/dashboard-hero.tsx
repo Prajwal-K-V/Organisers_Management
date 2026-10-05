@@ -74,26 +74,31 @@ export function DashboardHero({
 
   return (
     <div className="space-y-4">
-      <Card className="overflow-hidden !p-0">
-        <div className="bg-gradient-to-br from-[var(--primary)] via-[#dc2626] to-[var(--accent)] px-4 py-5 text-white sm:px-6">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-            <div
-              className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-white/20 text-xl font-bold shadow-inner ring-2 ring-white/30"
-              aria-hidden
-            >
-              {initials(profile.full_name, profile.email)}
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-xs font-semibold uppercase tracking-wider text-amber-100">Your profile</p>
-              <h2 className="mt-0.5 truncate text-xl font-bold sm:text-2xl">
-                {profile.full_name?.trim() || "Organizer"}
-              </h2>
-              <p className="mt-1 truncate text-sm text-amber-50/90">{profile.email}</p>
-              <Badge variant="accent" className="mt-2 border-white/30 bg-white/15 text-white">
-                Organizer
-              </Badge>
-            </div>
+      <Card className="border-[var(--border-subtle)] bg-gradient-to-r from-blue-50/90 via-white to-indigo-50/50 p-4 sm:p-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+          <div
+            className="brand-logo flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl text-lg font-extrabold text-white shadow-md shadow-blue-500/20"
+            aria-hidden
+          >
+            {initials(profile.full_name, profile.email)}
           </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-semibold uppercase tracking-wider text-[var(--primary)]">Your profile</p>
+            <h2 className="mt-0.5 truncate text-xl font-extrabold tracking-tight text-[var(--foreground)] sm:text-2xl">
+              {profile.full_name?.trim() || "Organizer"}
+            </h2>
+            <p className="mt-1 truncate text-sm text-[var(--muted)]">{profile.email}</p>
+            <Badge variant="default" className="mt-2 normal-case tracking-normal">
+              Organizer
+            </Badge>
+          </div>
+          {selected ? (
+            <div className="hidden shrink-0 text-right sm:block">
+              <p className="text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">Active event</p>
+              <p className="mt-1 max-w-[14rem] truncate font-semibold text-[var(--foreground)]">{selected.name}</p>
+              <p className="text-sm capitalize text-[var(--muted)]">{selected.status}</p>
+            </div>
+          ) : null}
         </div>
       </Card>
 
@@ -151,8 +156,8 @@ export function DashboardHero({
                     className={cn(
                       "flex h-12 w-12 items-center justify-center rounded-xl transition",
                       key === "finance" && "bg-emerald-50 text-emerald-700 group-hover:bg-emerald-100",
-                      key === "tournament" && "bg-amber-50 text-amber-800 group-hover:bg-amber-100",
-                      key === "auction" && "bg-red-50 text-[var(--primary)] group-hover:bg-red-100",
+                      key === "tournament" && "bg-blue-50 text-blue-800 group-hover:bg-blue-100",
+                      key === "auction" && "bg-indigo-50 text-indigo-700 group-hover:bg-indigo-100",
                       key === "teams" && "bg-sky-50 text-sky-800 group-hover:bg-sky-100"
                     )}
                   >

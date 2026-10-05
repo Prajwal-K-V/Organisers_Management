@@ -72,8 +72,8 @@ export function PendingProvider({ children }: { children: ReactNode }) {
       ) : null}
       <div
         className={cn(
-          "min-h-0 flex-1 transition-[opacity,transform] duration-200 ease-out",
-          busy && "pointer-events-none opacity-70 scale-[0.998]"
+          "min-h-0 flex-1",
+          formPending && "pointer-events-none opacity-70"
         )}
       >
         {children}

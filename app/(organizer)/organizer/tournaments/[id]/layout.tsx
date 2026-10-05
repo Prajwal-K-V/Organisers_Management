@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { TournamentTabs } from "@/components/tournament-tabs";
-import { ensureMyTournamentOrganizer } from "@/lib/ensure-tournament-organizer";
 import { requireOrganizer } from "@/utils/supabase/utility/auth";
 
 const tabs = (id: string) => [
@@ -29,9 +28,6 @@ export default async function TournamentLayout({
     .maybeSingle();
 
   if (!tournament) notFound();
-
-  const accessError = await ensureMyTournamentOrganizer(supabase, id);
-  if (accessError) notFound();
 
   return (
     <div className="space-y-6">

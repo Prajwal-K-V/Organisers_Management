@@ -13,10 +13,10 @@ export default async function LoginPage({
 
   return (
     <div className="relative flex min-h-[100dvh] items-center justify-center overflow-hidden p-4 sm:p-6">
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-amber-50 via-[#fffbf5] to-red-50" aria-hidden />
-      <Card className="relative z-10 w-full max-w-md space-y-6 border-2 border-[var(--border-subtle)]">
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-slate-50 via-white to-blue-50" aria-hidden />
+      <Card className="relative z-10 w-full max-w-md space-y-6 border border-[var(--border-subtle)] shadow-lg shadow-slate-200/60">
         <div className="text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-[var(--primary)] to-[var(--accent)] text-lg font-bold text-white shadow-lg">
+          <div className="brand-logo mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl text-lg font-extrabold text-white shadow-lg shadow-blue-500/25">
             OM
           </div>
           <h1 className="page-title text-2xl">Organisers Management</h1>

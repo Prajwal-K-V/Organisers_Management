@@ -116,13 +116,13 @@ export async function assignPlayerSale(tournamentId: string, formData: FormData)
     revalidatePath(path);
     revalidatePath(`/organizer/tournaments/${tournamentId}/players`);
     revalidatePath(`/organizer/tournaments/${tournamentId}/teams`);
+    revalidatePath(`/organizer/tournaments/${tournamentId}/team-view`);
     revalidatePath(`/organizer/tournaments/${tournamentId}/finance`);
 
     const { data: player } = await supabase.from("players").select("name").eq("id", playerId).single();
     const { data: team } = await supabase.from("teams").select("name").eq("id", teamId).single();
-    const label = player?.name && team?.name
-      ? `${player.name} → ${team.name} for ${amount}.`
-      : "Sale recorded.";
+    const label =
+      player?.name && team?.name ? `${player.name} → ${team.name} for ${amount}.` : "Sale recorded.";
     redirectWithFlash(path, "success", label);
   } catch (e) {
     if (e && typeof e === "object" && "digest" in e) throw e;

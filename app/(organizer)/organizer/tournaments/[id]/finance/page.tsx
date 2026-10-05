@@ -1,8 +1,10 @@
 import { FinanceManager } from "@/components/finance-manager";
 import { isAuctionLedgerEntry } from "@/lib/ledger";
+import { enrichLedgerCreators, enrichLedgerHistoryEditors } from "@/lib/ledger-profiles";
 import { getCanDeleteLedgerForTournament } from "@/lib/tournament-organizer";
 import { fetchOrganizerTeams } from "@/lib/organizer-queries";
 import { requireOrganizer } from "@/utils/supabase/utility/auth";
+import type { FinancialLedgerEntryWithCreator, FinancialLedgerHistoryWithEditor } from "@/types/database";
 
 export default async function FinancePage({ params }: { params: Promise<{ id: string }> }) {
   const { supabase, profile } = await requireOrganizer();
@@ -12,24 +14,60 @@ export default async function FinancePage({ params }: { params: Promise<{ id: st
     fetchOrganizerTeams(supabase, tournamentId),
     supabase
       .from("financial_ledger")
-      .select(
-        "*, creator:profiles!financial_ledger_created_by_fkey(full_name, email)"
-      )
+      .select("*, creator:profiles!created_by(full_name, email)")
       .eq("tournament_id", tournamentId)
       .order("created_at", { ascending: false }),
     supabase
       .from("financial_ledger_history")
-      .select(
-        "*, editor:profiles!financial_ledger_history_changed_by_fkey(full_name, email)"
-      )
+      .select("*, editor:profiles!changed_by(full_name, email)")
       .eq("tournament_id", tournamentId)
       .order("changed_at", { ascending: false }),
   ]);
 
-  const financeLedger = (ledger ?? []).filter((row) => !isAuctionLedgerEntry(row.entry_type));
+  const creatorIds = [
+    ...new Set(
+      (ledger ?? [])
+        .map((row) => row.created_by)
+        .filter((id): id is string => Boolean(id))
+    ),
+  ];
+  const editorIds = [
+    ...new Set(
+      (history ?? [])
+        .map((row) => row.changed_by)
+        .filter((id): id is string => Boolean(id))
+    ),
+  ];
+  const profileIds = [...new Set([...creatorIds, ...editorIds])];
+  const { data: profileRows } = profileIds.length
+    ? await supabase.from("profiles").select("id, full_name, email").in("id", profileIds)
+    : { data: [] as { id: string; full_name: string | null; email: string }[] };
+  const profileById = new Map((profileRows ?? []).map((p) => [p.id, p]));
 
-  const historyByLedgerId: Record<string, NonNullable<typeof history>> = {};
-  for (const row of history ?? []) {
+  let financeLedger = (ledger ?? []).filter((row) => !isAuctionLedgerEntry(row.entry_type)) as FinancialLedgerEntryWithCreator[];
+  financeLedger = financeLedger.map((row) => {
+    if (row.creator?.full_name?.trim() || row.creator?.email) return row;
+    const fromLookup = row.created_by ? profileById.get(row.created_by) : undefined;
+    if (fromLookup) {
+      return { ...row, creator: { full_name: fromLookup.full_name, email: fromLookup.email } };
+    }
+    return row;
+  });
+  financeLedger = enrichLedgerCreators(financeLedger, profile);
+
+  let historyRows = (history ?? []) as FinancialLedgerHistoryWithEditor[];
+  historyRows = historyRows.map((row) => {
+    if (row.editor?.full_name?.trim() || row.editor?.email) return row;
+    const fromLookup = row.changed_by ? profileById.get(row.changed_by) : undefined;
+    if (fromLookup) {
+      return { ...row, editor: { full_name: fromLookup.full_name, email: fromLookup.email } };
+    }
+    return row;
+  });
+  historyRows = enrichLedgerHistoryEditors(historyRows, profile);
+
+  const historyByLedgerId: Record<string, FinancialLedgerHistoryWithEditor[]> = {};
+  for (const row of historyRows) {
     const list = historyByLedgerId[row.ledger_id] ?? [];
     list.push(row);
     historyByLedgerId[row.ledger_id] = list;

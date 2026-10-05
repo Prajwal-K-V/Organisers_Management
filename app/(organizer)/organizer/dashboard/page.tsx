@@ -6,11 +6,7 @@ import { PageHeader } from "@/components/page-header";
 import { TournamentListItem } from "@/components/tournament-list-item";
 import { Card } from "@/components/ui/card";
 import { formatCredits, sumLedgerFlows } from "@/lib/dashboard-finance";
-import {
-  fetchOrganizerPlayers,
-  fetchOrganizerTeams,
-  fetchOrganizerTournaments,
-} from "@/lib/organizer-queries";
+import { fetchOrganizerSquadSummary, fetchOrganizerTournaments } from "@/lib/organizer-queries";
 import { requireOrganizer } from "@/utils/supabase/utility/auth";
 
 function endOfDayIso(date: string) {
@@ -29,35 +25,23 @@ export default async function OrganizerDashboardPage({
 
   const tournamentIds = tournaments.map((t) => t.id);
 
-  const [ledgerRes, teamRows, playerRows] = await Promise.all([
+  const [ledgerRes, squad] = await Promise.all([
     (async () => {
       if (!tournamentIds.length) return { data: [] as { entry_type: string; amount: number }[] };
       let q = supabase
         .from("financial_ledger")
-        .select("entry_type, amount, created_at, description, tournament_id")
+        .select("entry_type, amount")
         .in("tournament_id", tournamentIds)
         .neq("entry_type", "bid");
       if (from) q = q.gte("created_at", from);
       if (to) q = q.lte("created_at", endOfDayIso(to));
       return q;
     })(),
-    tournamentIds.length
-      ? Promise.all(tournamentIds.map((tid) => fetchOrganizerTeams(supabase, tid))).then((lists) =>
-          lists.flat()
-        )
-      : Promise.resolve([]),
-    tournamentIds.length
-      ? Promise.all(tournamentIds.map((tid) => fetchOrganizerPlayers(supabase, tid))).then((lists) =>
-          lists.flat()
-        )
-      : Promise.resolve([]),
+    fetchOrganizerSquadSummary(supabase, tournamentIds),
   ]);
 
   const finance = sumLedgerFlows(ledgerRes.data ?? []);
-  const players = playerRows;
-  const soldCount = players.filter((p) => p.status === "sold").length;
-  const teamCount = teamRows.length;
-  const playerCount = players.length;
+  const { teamCount, playerCount, soldCount } = squad;
 
   const periodLabel =
     from && to ? `${from} → ${to}` : from ? `From ${from}` : to ? `Until ${to}` : "All time";

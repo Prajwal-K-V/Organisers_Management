@@ -15,7 +15,7 @@ export default async function UpdatePasswordPage({
   return (
     <div className="relative flex min-h-[100dvh] items-center justify-center overflow-hidden p-4 sm:p-6">
       <div
-        className="pointer-events-none absolute inset-0 bg-gradient-to-br from-amber-50 via-[#fffbf5] to-red-50"
+        className="pointer-events-none absolute inset-0 bg-gradient-to-br from-slate-50 via-white to-blue-50"
         aria-hidden
       />
       <Card className="relative z-10 w-full max-w-md space-y-6 border-2 border-[var(--border-subtle)]">

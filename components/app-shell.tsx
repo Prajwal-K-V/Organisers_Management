@@ -35,12 +35,12 @@ function SidebarPanel({
 }) {
   return (
     <aside className={cn("flex h-full w-[min(100vw-3rem,17rem)] flex-col border-r-2 border-[var(--sidebar-border)] bg-[var(--sidebar)] md:w-64", className)}>
-      <div className="border-b border-[var(--border-subtle)] bg-gradient-to-br from-[var(--primary)] via-[#dc2626] to-[var(--accent)] px-5 py-5 text-white">
+      <div className="brand-surface border-b border-white/10 px-5 py-5">
         <div className="flex items-center gap-2">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/20 text-sm font-bold">OM</span>
+          <span className="brand-logo flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-sm font-extrabold text-white shadow-md">OM</span>
           <div className="min-w-0">
-            <p className="truncate text-lg font-bold leading-tight">{title}</p>
-            {subtitle && <p className="truncate text-xs text-amber-100">{subtitle}</p>}
+            <p className="truncate text-lg font-extrabold leading-tight tracking-tight">{title}</p>
+            {subtitle && <p className="truncate text-xs font-medium text-blue-100/90">{subtitle}</p>}
           </div>
         </div>
       </div>
@@ -51,7 +51,7 @@ function SidebarPanel({
       </nav>
       {signOutAction && (
         <form action={signOutAction} className="border-t border-[var(--border-subtle)] p-4">
-          <button type="submit" className="w-full rounded-lg px-3 py-2.5 text-left text-sm font-medium text-stone-500 transition hover:bg-[var(--accent-soft)] hover:text-[var(--primary)]">
+          <button type="submit" className="w-full rounded-xl px-3 py-2.5 text-left text-sm font-medium text-slate-500 transition hover:bg-[var(--accent-soft)] hover:text-[var(--primary)]">
             Sign out
           </button>
         </form>

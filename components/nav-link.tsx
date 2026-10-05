@@ -29,8 +29,8 @@ export function NavLink({
       className={cn(
         "rounded-lg px-3 py-2.5 text-sm font-medium transition",
         active
-          ? "bg-gradient-to-r from-[var(--primary)] to-[#dc2626] text-white shadow-sm"
-          : "text-stone-600 hover:bg-[var(--accent-soft)] hover:text-[var(--accent-foreground)]"
+          ? "bg-[var(--primary)] text-white shadow-md shadow-blue-600/15"
+          : "text-slate-600 hover:bg-[var(--accent-soft)] hover:text-[var(--accent-foreground)]"
       )}
     >
       {label}

@@ -58,3 +58,133 @@ export function buildPlayerSoldUpdate(teamId: string, soldPrice: number) {
     sold_price: soldPrice,
   };
 }
+
+export type BulkPlayerImportRow = {
+  name: string;
+  role: PlayingRole;
+  basePrice: number;
+};
+
+const BULK_PLAYER_IMPORT_MAX_ROWS = 500;
+
+function parseCsvLine(line: string): string[] {
+  const cells: string[] = [];
+  let current = "";
+  let inQuotes = false;
+
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') {
+      if (inQuotes && line[i + 1] === '"') {
+        current += '"';
+        i++;
+      } else {
+        inQuotes = !inQuotes;
+      }
+      continue;
+    }
+    if (!inQuotes && ch === ",") {
+      cells.push(current.trim());
+      current = "";
+      continue;
+    }
+    current += ch;
+  }
+  cells.push(current.trim());
+  return cells;
+}
+
+function looksLikeHeader(cells: string[]): boolean {
+  if (cells.length < 2) return false;
+  const joined = cells.join(" ").toLowerCase();
+  return joined.includes("name") && (joined.includes("role") || joined.includes("base") || joined.includes("price"));
+}
+
+function parseBasePrice(raw: string): number | null {
+  const cleaned = raw.replace(/,/g, "").trim();
+  if (!cleaned) return 0;
+  const n = Number(cleaned);
+  if (Number.isNaN(n) || n < 0) return null;
+  return n;
+}
+
+/** Parse CSV or tab-separated bulk player text (name, role, base_price). */
+export function parseBulkPlayerImport(text: string): {
+  rows: BulkPlayerImportRow[];
+  errors: string[];
+} {
+  const errors: string[] = [];
+  const rows: BulkPlayerImportRow[] = [];
+  const lines = text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0 && !line.startsWith("#"));
+
+  if (!lines.length) {
+    return { rows, errors: ["Paste or upload at least one player row."] };
+  }
+
+  let startIndex = 0;
+  const firstCells = parseCsvLine(lines[0].includes("\t") ? lines[0].replace(/\t/g, ",") : lines[0]);
+  if (looksLikeHeader(firstCells)) startIndex = 1;
+
+  for (let i = startIndex; i < lines.length; i++) {
+    const lineNo = i + 1;
+    const normalized = lines[i].includes("\t") ? lines[i].replace(/\t/g, ",") : lines[i];
+    const cells = parseCsvLine(normalized);
+    if (!cells.some((c) => c.length > 0)) continue;
+
+    const name = cells[0]?.trim() ?? "";
+    if (!name) {
+      errors.push(`Line ${lineNo}: player name is required.`);
+      continue;
+    }
+
+    let roleRaw = "";
+    let baseRaw = "0";
+
+    if (cells.length === 1) {
+      roleRaw = "";
+      baseRaw = "0";
+    } else if (cells.length === 2) {
+      const second = cells[1] ?? "";
+      if (/^\d/.test(second.replace(/,/g, "").trim())) {
+        baseRaw = second;
+      } else {
+        roleRaw = second;
+      }
+    } else {
+      roleRaw = cells[1] ?? "";
+      baseRaw = cells[2] ?? "0";
+    }
+
+    const basePrice = parseBasePrice(baseRaw);
+    if (basePrice === null) {
+      errors.push(`Line ${lineNo}: invalid base price “${baseRaw}”.`);
+      continue;
+    }
+
+    rows.push({
+      name,
+      role: normalizePlayingRole(roleRaw),
+      basePrice,
+    });
+  }
+
+  if (rows.length > BULK_PLAYER_IMPORT_MAX_ROWS) {
+    return {
+      rows: [],
+      errors: [`Import up to ${BULK_PLAYER_IMPORT_MAX_ROWS} players at a time (got ${rows.length}).`],
+    };
+  }
+
+  return { rows, errors };
+}
+
+export function allocatePlayerCodes(existing: string[], count: number): string[] {
+  if (count <= 0) return [];
+  const first = nextPlayerCodeFromExisting(existing);
+  const match = /^P(\d+)$/i.exec(first);
+  const start = match ? Number.parseInt(match[1], 10) : 1;
+  return Array.from({ length: count }, (_, i) => formatPlayerCode(start + i));
+}

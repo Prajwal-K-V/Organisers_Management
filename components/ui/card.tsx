@@ -5,7 +5,7 @@ export function Card({ children, className = "" }: { children: ReactNode; classN
   return (
     <div
       className={cn(
-        "rounded-2xl border border-[var(--border-subtle)] bg-[var(--card)] p-4 sm:p-6",
+        "rounded-2xl border border-[var(--border-subtle)] bg-[var(--card)] p-4 sm:p-6 ring-1 ring-slate-900/[0.03]",
         "shadow-[var(--shadow-card)]",
         className
       )}

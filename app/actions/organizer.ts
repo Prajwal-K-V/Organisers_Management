@@ -5,9 +5,11 @@ import { requireOrganizer } from "@/utils/supabase/utility/auth";
 import { redirect } from "next/navigation";
 import { redirectWithFlash } from "@/lib/flash";
 import {
+  allocatePlayerCodes,
   buildPlayerInsertRow,
   nextPlayerCodeFromExisting,
   normalizePlayingRole,
+  parseBulkPlayerImport,
 } from "@/lib/players";
 import { syncTeamPurseRemaining } from "@/lib/team-purse";
 import { teamPurseRemaining, teamSpendFromPlayers } from "@/lib/team-roster";
@@ -127,6 +129,59 @@ export async function createPlayer(tournamentId: string, formData: FormData) {
   } catch (e) {
     if (e && typeof e === "object" && "digest" in e) throw e;
     redirectWithFlash(path, "error", "Could not add player.");
+  }
+}
+
+export async function bulkCreatePlayers(tournamentId: string, formData: FormData) {
+  const path = `${tournamentBase(tournamentId)}/players`;
+  try {
+    const { supabase } = await getSupabase();
+    await prepareTournamentWrite(supabase, tournamentId, path);
+
+    let text = String(formData.get("bulk_text") ?? "").trim();
+    const file = formData.get("bulk_file");
+    if (file instanceof File && file.size > 0) {
+      text = (await file.text()).trim();
+    }
+
+    const { rows, errors } = parseBulkPlayerImport(text);
+    if (errors.length) {
+      redirectWithFlash(path, "error", errors.slice(0, 5).join(" "));
+    }
+    if (!rows.length) {
+      redirectWithFlash(path, "error", "No valid player rows found.");
+    }
+
+    const { data: existingCodes } = await supabase
+      .from("players")
+      .select("player_code")
+      .eq("tournament_id", tournamentId);
+    const codes = allocatePlayerCodes(
+      (existingCodes ?? []).map((row) => row.player_code).filter(Boolean) as string[],
+      rows.length
+    );
+
+    const payload = rows.map((row, index) =>
+      buildPlayerInsertRow({
+        tournamentId,
+        name: row.name,
+        playerCode: codes[index]!,
+        basePrice: row.basePrice,
+        role: row.role,
+      })
+    );
+
+    const chunkSize = 100;
+    for (let i = 0; i < payload.length; i += chunkSize) {
+      const { error } = await supabase.from("players").insert(payload.slice(i, i + chunkSize));
+      if (error) redirectWithFlash(path, "error", error.message);
+    }
+
+    revalidatePlayerRosterPaths(tournamentId);
+    redirectWithFlash(path, "success", `Added ${rows.length} players.`);
+  } catch (e) {
+    if (e && typeof e === "object" && "digest" in e) throw e;
+    redirectWithFlash(path, "error", "Could not import players.");
   }
 }
 
@@ -441,6 +496,7 @@ export async function addLedgerEntry(tournamentId: string, formData: FormData) {
       created_by: profile.id,
     });
     if (error) redirectWithFlash(path, "error", error.message);
+    revalidatePath(path);
     redirectWithFlash(path, "success", "Ledger entry saved.");
   } catch (e) {
     if (e && typeof e === "object" && "digest" in e) throw e;
@@ -483,6 +539,7 @@ export async function updateLedgerEntry(tournamentId: string, ledgerId: string, 
       .eq("id", ledgerId)
       .eq("tournament_id", tournamentId);
     if (error) redirectWithFlash(path, "error", error.message);
+    revalidatePath(path);
     redirectWithFlash(path, "success", "Ledger entry updated.");
   } catch (e) {
     if (e && typeof e === "object" && "digest" in e) throw e;

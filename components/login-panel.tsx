@@ -19,7 +19,7 @@ export function LoginPanel() {
             "rounded-lg py-2.5 text-sm font-semibold transition",
             mode === "password"
               ? "bg-white text-[var(--primary)] shadow-sm"
-              : "text-stone-600 hover:text-stone-900"
+              : "text-slate-600 hover:text-slate-900"
           )}
           onClick={() => setMode("password")}
         >
@@ -31,7 +31,7 @@ export function LoginPanel() {
             "rounded-lg py-2.5 text-sm font-semibold transition",
             mode === "magic"
               ? "bg-white text-[var(--primary)] shadow-sm"
-              : "text-stone-600 hover:text-stone-900"
+              : "text-slate-600 hover:text-slate-900"
           )}
           onClick={() => setMode("magic")}
         >
