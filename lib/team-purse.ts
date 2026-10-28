@@ -7,21 +7,27 @@ export async function syncTeamPurseRemaining(
   tournamentId: string,
   teamId: string
 ) {
-  const { data: team, error: teamError } = await supabase
-    .from("teams")
-    .select("purse_total")
-    .eq("id", teamId)
-    .eq("tournament_id", tournamentId)
-    .single();
-  if (teamError || !team) return teamError ?? new Error("Team not found");
+  // Fetch team budget and team's sold players in parallel (independent queries)
+  const [{ data: team, error: teamError }, { data: soldPlayers, error: playersError }] =
+    await Promise.all([
+      supabase
+        .from("teams")
+        .select("purse_total")
+        .eq("id", teamId)
+        .eq("tournament_id", tournamentId)
+        .single(),
+      supabase
+        .from("players")
+        .select("sold_price")
+        .eq("tournament_id", tournamentId)
+        .eq("team_id", teamId)
+        .eq("status", "sold"),
+    ]);
 
-  const { data: players, error: playersError } = await supabase
-    .from("players")
-    .select("team_id, sold_price")
-    .eq("tournament_id", tournamentId);
+  if (teamError || !team) return teamError ?? new Error("Team not found");
   if (playersError) return playersError;
 
-  const spent = teamSpendFromPlayers(players ?? [], teamId);
+  const spent = (soldPlayers ?? []).reduce((s, p) => s + Number(p.sold_price ?? 0), 0);
   const { error: updateError } = await supabase
     .from("teams")
     .update({ purse_remaining: Number(team.purse_total) - spent })
