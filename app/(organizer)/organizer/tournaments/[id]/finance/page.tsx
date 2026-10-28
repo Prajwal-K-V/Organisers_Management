@@ -74,13 +74,15 @@ export default async function FinancePage({ params }: { params: Promise<{ id: st
   }
 
   const csvRows = [
-    ["date", "type", "team_id", "amount", "added_by", "description"].join(","),
+    ["date", "type", "payment_mode", "status", "team_id", "amount", "added_by", "description"].join(","),
     ...financeLedger.map((row) => {
       const addedBy =
         row.creator?.full_name?.trim() || row.creator?.email || "";
       return [
         row.created_at,
         row.entry_type,
+        row.payment_mode ?? "",
+        row.status ?? "settled",
         row.team_id ?? "",
         row.amount,
         `"${addedBy}"`,

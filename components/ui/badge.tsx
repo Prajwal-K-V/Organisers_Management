@@ -7,7 +7,7 @@ export function Badge({
   className,
 }: {
   children: ReactNode;
-  variant?: "default" | "accent" | "success" | "danger" | "muted";
+  variant?: "default" | "accent" | "success" | "danger" | "muted" | "warning";
   className?: string;
 }) {
   const variants = {
@@ -16,6 +16,7 @@ export function Badge({
     success: "bg-[var(--success-bg)] text-[var(--success-text)] border-emerald-200",
     danger: "bg-[var(--error-bg)] text-[var(--danger)] border-red-200",
     muted: "bg-stone-100 text-stone-600 border-stone-200",
+    warning: "bg-amber-50 text-amber-700 border-amber-200",
   };
   return (
     <span

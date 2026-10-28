@@ -447,7 +447,12 @@ type ManualLedgerFormValues = {
   entryType: (typeof MANUAL_LEDGER_FORM_TYPES)[number] | "opening_balance";
   amount: number;
   description: string | null;
+  paymentMode: string | null;
+  status: string;
 };
+
+const VALID_PAYMENT_MODES = ["cash", "phonepe", "bank_transfer", "upi", "other"];
+const VALID_STATUSES = ["settled", "pending"];
 
 function parseManualLedgerForm(
   formData: FormData,
@@ -457,6 +462,8 @@ function parseManualLedgerForm(
   const entryType = String(formData.get("entry_type") ?? "adjustment");
   const amount = Number(formData.get("amount") ?? 0);
   const description = String(formData.get("description") ?? "").trim();
+  const rawPaymentMode = String(formData.get("payment_mode") ?? "").trim();
+  const rawStatus = String(formData.get("status") ?? "settled").trim();
   const allowed = options?.allowOpeningBalance
     ? [...MANUAL_LEDGER_FORM_TYPES, "opening_balance"]
     : MANUAL_LEDGER_FORM_TYPES;
@@ -466,6 +473,8 @@ function parseManualLedgerForm(
   if (!Number.isFinite(amount)) {
     return { ok: false, message: "Invalid amount." };
   }
+  const paymentMode = rawPaymentMode && VALID_PAYMENT_MODES.includes(rawPaymentMode) ? rawPaymentMode : null;
+  const status = VALID_STATUSES.includes(rawStatus) ? rawStatus : "settled";
   return {
     ok: true,
     value: {
@@ -473,6 +482,8 @@ function parseManualLedgerForm(
       entryType: entryType as ManualLedgerFormValues["entryType"],
       amount,
       description: description || null,
+      paymentMode,
+      status,
     },
   };
 }
@@ -486,13 +497,15 @@ export async function addLedgerEntry(tournamentId: string, formData: FormData) {
     if (!parsed.ok) {
       redirectWithFlash(path, "error", parsed.message);
     }
-    const { teamId, entryType, amount, description } = parsed.value;
+    const { teamId, entryType, amount, description, paymentMode, status } = parsed.value;
     const { error } = await supabase.from("financial_ledger").insert({
       tournament_id: tournamentId,
       team_id: teamId,
       entry_type: entryType,
       amount,
       description,
+      payment_mode: paymentMode,
+      status,
       created_by: profile.id,
     });
     if (error) redirectWithFlash(path, "error", error.message);
@@ -526,7 +539,7 @@ export async function updateLedgerEntry(tournamentId: string, ledgerId: string, 
     if (!parsed.ok) {
       redirectWithFlash(path, "error", parsed.message);
     }
-    const { teamId, entryType, amount, description } = parsed.value;
+    const { teamId, entryType, amount, description, paymentMode, status } = parsed.value;
 
     const { error } = await supabase
       .from("financial_ledger")
@@ -535,6 +548,8 @@ export async function updateLedgerEntry(tournamentId: string, ledgerId: string, 
         entry_type: entryType,
         amount,
         description,
+        payment_mode: paymentMode,
+        status,
       })
       .eq("id", ledgerId)
       .eq("tournament_id", tournamentId);

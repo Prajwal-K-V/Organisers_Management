@@ -20,11 +20,13 @@ import {
   MANUAL_LEDGER_FORM_TYPES,
 } from "@/lib/ledger";
 import { cn } from "@/lib/utils";
-import type {
-  FinancialLedgerEntryWithCreator,
-  FinancialLedgerHistoryWithEditor,
-  LedgerEntryType,
-  Team,
+import {
+  PAYMENT_MODE_LABELS,
+  PAYMENT_MODES,
+  type FinancialLedgerEntryWithCreator,
+  type FinancialLedgerHistoryWithEditor,
+  type LedgerEntryType,
+  type Team,
 } from "@/types/database";
 
 function profileLabel(profile: { full_name: string | null; email: string } | null | undefined) {
@@ -47,6 +49,7 @@ const ENTRY_TYPE_LABELS: Record<(typeof MANUAL_LEDGER_FORM_TYPES)[number], strin
   expense: "Expense",
   adjustment: "Adjustment",
   refund: "Refund",
+  pending: "Pending",
 };
 
 function LedgerEntryForm({
@@ -78,6 +81,7 @@ function LedgerEntryForm({
             <option value="income">Income</option>
             <option value="expense">Expense</option>
             <option value="refund">Refund</option>
+            <option value="pending">Pending</option>
             {showOpeningBalance ? <option value="opening_balance">Opening balance</option> : null}
           </Select>
         ) : (
@@ -105,6 +109,22 @@ function LedgerEntryForm({
           placeholder="What was this for?"
           defaultValue={entry?.description ?? ""}
         />
+        <label className="block space-y-1.5">
+          <span className="text-sm font-medium">Payment Mode</span>
+          <Select name="payment_mode" defaultValue={entry?.payment_mode ?? ""}>
+            <option value="">— None —</option>
+            {PAYMENT_MODES.map((mode) => (
+              <option key={mode} value={mode}>{PAYMENT_MODE_LABELS[mode]}</option>
+            ))}
+          </Select>
+        </label>
+        <label className="block space-y-1.5">
+          <span className="text-sm font-medium">Status</span>
+          <Select name="status" defaultValue={entry?.status ?? "settled"}>
+            <option value="settled">Settled</option>
+            <option value="pending">Pending</option>
+          </Select>
+        </label>
         {isEdit ? (
           <label className="block space-y-1.5">
             <span className="text-sm font-medium">Team (optional)</span>
@@ -152,11 +172,15 @@ function LedgerHistoryList({
                 entry_type: current.entry_type,
                 amount: current.amount,
                 description: current.description,
+                payment_mode: current.payment_mode,
+                status: current.status,
               }
             : {
                 entry_type: sorted[index - 1].entry_type,
                 amount: sorted[index - 1].amount,
                 description: sorted[index - 1].description,
+                payment_mode: sorted[index - 1].payment_mode,
+                status: sorted[index - 1].status,
               };
 
         const changes: string[] = [];
@@ -168,6 +192,12 @@ function LedgerHistoryList({
         }
         if ((row.description ?? "") !== (next.description ?? "")) {
           changes.push("description updated");
+        }
+        if ((row.payment_mode ?? "") !== (next.payment_mode ?? "")) {
+          changes.push("payment mode updated");
+        }
+        if ((row.status ?? "") !== (next.status ?? "")) {
+          changes.push(`status: ${row.status ?? "—"} → ${next.status ?? "—"}`);
         }
 
         return (
@@ -198,12 +228,45 @@ export function FinanceManager({
 }) {
   const [addOpen, setAddOpen] = useState(false);
   const [editing, setEditing] = useState<FinancialLedgerEntryWithCreator | null>(null);
+  const [search, setSearch] = useState("");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
 
   const totals = useMemo(() => sumLedgerFlows(ledger), [ledger]);
+
   const sortedLedger = useMemo(
     () => [...ledger].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()),
     [ledger]
   );
+
+  const paymentBreakdown = useMemo(() => {
+    const map: Partial<Record<string, number>> = {};
+    for (const row of ledger) {
+      if (!row.payment_mode) continue;
+      const tone = ledgerEntryTone(row.entry_type, Number(row.amount));
+      if (tone !== "income") continue;
+      map[row.payment_mode] = (map[row.payment_mode] ?? 0) + Number(row.amount);
+    }
+    return Object.entries(map).filter(([, v]) => v! > 0);
+  }, [ledger]);
+
+  const pendingTotal = useMemo(
+    () => ledger.filter((r) => r.status === "pending").reduce((s, r) => s + Number(r.amount), 0),
+    [ledger]
+  );
+
+  const filteredLedger = useMemo(() => {
+    const q = search.toLowerCase();
+    return sortedLedger
+      .filter(
+        (e) =>
+          !q ||
+          (e.description ?? "").toLowerCase().includes(q) ||
+          profileLabel(e.creator).toLowerCase().includes(q)
+      )
+      .filter((e) => !fromDate || e.created_at >= fromDate)
+      .filter((e) => !toDate || e.created_at <= toDate + "T23:59:59");
+  }, [sortedLedger, search, fromDate, toDate]);
 
   const closeModals = () => {
     setAddOpen(false);
@@ -212,7 +275,8 @@ export function FinanceManager({
 
   return (
     <div className="space-y-5">
-      <Card className="!p-4">
+      {/* Summary card */}
+      <Card className="!p-4 space-y-4">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <dl className="grid grid-cols-3 gap-3 text-center sm:gap-6 sm:text-left">
             <div>
@@ -250,6 +314,33 @@ export function FinanceManager({
             ) : null}
           </div>
         </div>
+
+        {/* Payment mode breakdown */}
+        {paymentBreakdown.length > 0 && (
+          <div className="border-t border-[var(--border-subtle)] pt-3">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Received by</p>
+            <dl className="flex flex-wrap gap-4">
+              {paymentBreakdown.map(([mode, amount]) => (
+                <div key={mode}>
+                  <dt className="text-xs text-[var(--muted)]">
+                    {PAYMENT_MODE_LABELS[mode as keyof typeof PAYMENT_MODE_LABELS] ?? mode}
+                  </dt>
+                  <dd className="text-sm font-semibold text-[var(--success-text)] tabular-nums">
+                    {formatCredits(amount!)}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+        )}
+
+        {/* Pending total */}
+        {pendingTotal > 0 && (
+          <div className="border-t border-[var(--border-subtle)] pt-3 flex items-center gap-2">
+            <span className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Pending</span>
+            <span className="text-sm font-semibold text-amber-600 tabular-nums">{formatCredits(pendingTotal)}</span>
+          </div>
+        )}
       </Card>
 
       {!ledger.length ? (
@@ -263,66 +354,123 @@ export function FinanceManager({
           />
         </Card>
       ) : (
-        <Card className="!p-0 overflow-hidden">
-          <ul className="divide-y divide-[var(--border-subtle)]">
-            {sortedLedger.map((row) => {
-              const tone = ledgerEntryTone(row.entry_type, Number(row.amount));
-              const editable = isEditableLedgerEntry(row.entry_type);
-              const deletable = canDeleteLedger && isDeletableLedgerEntry(row.entry_type);
-              const badgeVariant =
-                tone === "income" ? "success" : tone === "expense" ? "danger" : "muted";
+        <>
+          {/* Search & date filter */}
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <input
+              type="search"
+              placeholder="Search description or creator…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="flex-1 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm placeholder:text-[var(--muted)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+            />
+            <div className="flex gap-2">
+              <input
+                type="date"
+                value={fromDate}
+                onChange={(e) => setFromDate(e.target.value)}
+                className="rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+                title="From date"
+              />
+              <input
+                type="date"
+                value={toDate}
+                onChange={(e) => setToDate(e.target.value)}
+                className="rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+                title="To date"
+              />
+              {(search || fromDate || toDate) && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="px-2 text-xs"
+                  onClick={() => { setSearch(""); setFromDate(""); setToDate(""); }}
+                >
+                  Clear
+                </Button>
+              )}
+            </div>
+          </div>
 
-              return (
-                <li key={row.id} className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Badge variant={badgeVariant} className="normal-case tracking-normal">
-                        {formatLedgerEntryType(row.entry_type)}
-                      </Badge>
-                      <span className="text-xs text-[var(--muted)]">{formatLedgerDate(row.created_at)}</span>
-                      <span className="text-xs text-[var(--muted)]">· Added by {profileLabel(row.creator)}</span>
-                    </div>
-                    <p className="mt-1 truncate text-sm text-stone-800">
-                      {row.description?.trim() || "—"}
-                    </p>
-                  </div>
-                  <div className="flex items-center justify-between gap-3 sm:justify-end">
-                    <span
-                      className={cn(
-                        "text-base font-bold tabular-nums",
-                        tone === "income" && "text-[var(--success-text)]",
-                        tone === "expense" && "text-[var(--danger)]"
-                      )}
-                    >
-                      {formatCredits(Number(row.amount))}
-                    </span>
-                    <div className="flex shrink-0 gap-1">
-                      {editable ? (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          className="h-8 px-2 text-xs"
-                          onClick={() => setEditing(row)}
+          <Card className="!p-0 overflow-hidden">
+            {filteredLedger.length === 0 ? (
+              <div className="px-4 py-8 text-center text-sm text-[var(--muted)]">
+                No entries match your filters.
+              </div>
+            ) : (
+              <ul className="divide-y divide-[var(--border-subtle)]">
+                {filteredLedger.map((row) => {
+                  const tone = ledgerEntryTone(row.entry_type, Number(row.amount));
+                  const editable = isEditableLedgerEntry(row.entry_type);
+                  const deletable = canDeleteLedger && isDeletableLedgerEntry(row.entry_type);
+                  const badgeVariant =
+                    tone === "income" ? "success" : tone === "expense" ? "danger" : "muted";
+                  const isPending = row.status === "pending";
+                  const paymentLabel = row.payment_mode
+                    ? (PAYMENT_MODE_LABELS[row.payment_mode as keyof typeof PAYMENT_MODE_LABELS] ?? row.payment_mode)
+                    : null;
+
+                  return (
+                    <li key={row.id} className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Badge variant={badgeVariant} className="normal-case tracking-normal">
+                            {formatLedgerEntryType(row.entry_type)}
+                          </Badge>
+                          {isPending && (
+                            <Badge variant="warning" className="normal-case tracking-normal">
+                              Pending
+                            </Badge>
+                          )}
+                          <span className="text-xs text-[var(--muted)]">{formatLedgerDate(row.created_at)}</span>
+                          <span className="text-xs text-[var(--muted)]">· Added by {profileLabel(row.creator)}</span>
+                          {paymentLabel && (
+                            <span className="text-xs text-[var(--muted)]">· via {paymentLabel}</span>
+                          )}
+                        </div>
+                        <p className="mt-1 truncate text-sm text-stone-800">
+                          {row.description?.trim() || "—"}
+                        </p>
+                      </div>
+                      <div className="flex items-center justify-between gap-3 sm:justify-end">
+                        <span
+                          className={cn(
+                            "text-base font-bold tabular-nums",
+                            tone === "income" && "text-[var(--success-text)]",
+                            tone === "expense" && "text-[var(--danger)]"
+                          )}
                         >
-                          Edit
-                        </Button>
-                      ) : null}
-                      {deletable ? (
-                        <ConfirmSubmit
-                          action={deleteLedgerEntry.bind(null, tournamentId, row.id)}
-                          message="Delete this entry?"
-                          className="inline"
-                        >
-                          <ConfirmDeleteButton label="Delete" className="!h-8 !px-2 !text-xs !font-semibold" />
-                        </ConfirmSubmit>
-                      ) : null}
-                    </div>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        </Card>
+                          {formatCredits(Number(row.amount))}
+                        </span>
+                        <div className="flex shrink-0 gap-1">
+                          {editable ? (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              className="h-8 px-2 text-xs"
+                              onClick={() => setEditing(row)}
+                            >
+                              Edit
+                            </Button>
+                          ) : null}
+                          {deletable ? (
+                            <ConfirmSubmit
+                              action={deleteLedgerEntry.bind(null, tournamentId, row.id)}
+                              message="Delete this entry?"
+                              className="inline"
+                            >
+                              <ConfirmDeleteButton label="Delete" className="!h-8 !px-2 !text-xs !font-semibold" />
+                            </ConfirmSubmit>
+                          ) : null}
+                        </div>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </Card>
+        </>
       )}
 
       <Modal open={addOpen} onClose={closeModals} title="Add entry">
