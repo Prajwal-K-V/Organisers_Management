@@ -10,7 +10,7 @@ export default async function FinancePage({ params }: { params: Promise<{ id: st
   const { supabase, profile } = await requireOrganizer();
   const { id: tournamentId } = await params;
 
-  const [teams, { data: ledger }, { data: history }] = await Promise.all([
+  const [teams, { data: ledger }, { data: history }, canDeleteLedger] = await Promise.all([
     fetchOrganizerTeams(supabase, tournamentId),
     supabase
       .from("financial_ledger")
@@ -22,6 +22,7 @@ export default async function FinancePage({ params }: { params: Promise<{ id: st
       .select("*, editor:profiles!changed_by(full_name, email)")
       .eq("tournament_id", tournamentId)
       .order("changed_at", { ascending: false }),
+    getCanDeleteLedgerForTournament(supabase, tournamentId, profile.id),
   ]);
 
   const creatorIds = [
@@ -92,7 +93,6 @@ export default async function FinancePage({ params }: { params: Promise<{ id: st
   ].join("\n");
 
   const csvHref = `data:text/csv;charset=utf-8,${encodeURIComponent(csvRows)}`;
-  const canDeleteLedger = await getCanDeleteLedgerForTournament(supabase, tournamentId, profile.id);
 
   return (
     <FinanceManager

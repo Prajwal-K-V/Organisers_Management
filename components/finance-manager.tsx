@@ -231,6 +231,8 @@ export function FinanceManager({
   const [search, setSearch] = useState("");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
+  const [filterType, setFilterType] = useState<string>("");
+  const [filterStatus, setFilterStatus] = useState<string>("");
 
   const totals = useMemo(() => sumLedgerFlows(ledger), [ledger]);
 
@@ -265,8 +267,12 @@ export function FinanceManager({
           profileLabel(e.creator).toLowerCase().includes(q)
       )
       .filter((e) => !fromDate || e.created_at >= fromDate)
-      .filter((e) => !toDate || e.created_at <= toDate + "T23:59:59");
-  }, [sortedLedger, search, fromDate, toDate]);
+      .filter((e) => !toDate || e.created_at <= toDate + "T23:59:59")
+      .filter((e) => !filterType || e.entry_type === filterType)
+      .filter((e) => !filterStatus || e.status === filterStatus);
+  }, [sortedLedger, search, fromDate, toDate, filterType, filterStatus]);
+
+  const hasActiveFilters = Boolean(search || fromDate || toDate || filterType || filterStatus);
 
   const closeModals = () => {
     setAddOpen(false);
@@ -355,38 +361,64 @@ export function FinanceManager({
         </Card>
       ) : (
         <>
-          {/* Search & date filter */}
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            <input
-              type="search"
-              placeholder="Search description or creator…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="flex-1 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm placeholder:text-[var(--muted)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
-            />
-            <div className="flex gap-2">
+          {/* Search, type/status filter & date filter */}
+          <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
               <input
-                type="date"
-                value={fromDate}
-                onChange={(e) => setFromDate(e.target.value)}
-                className="rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
-                title="From date"
+                type="search"
+                placeholder="Search description or creator…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="flex-1 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm placeholder:text-[var(--muted)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
               />
-              <input
-                type="date"
-                value={toDate}
-                onChange={(e) => setToDate(e.target.value)}
-                className="rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
-                title="To date"
-              />
-              {(search || fromDate || toDate) && (
+              <div className="flex gap-2">
+                <input
+                  type="date"
+                  value={fromDate}
+                  onChange={(e) => setFromDate(e.target.value)}
+                  className="rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+                  title="From date"
+                />
+                <input
+                  type="date"
+                  value={toDate}
+                  onChange={(e) => setToDate(e.target.value)}
+                  className="rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+                  title="To date"
+                />
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2 items-center">
+              <Select
+                value={filterType}
+                onChange={(e) => setFilterType(e.target.value)}
+                className="w-auto text-sm"
+              >
+                <option value="">All types</option>
+                <option value="income">Income</option>
+                <option value="expense">Expense</option>
+                <option value="refund">Refund</option>
+                <option value="adjustment">Adjustment</option>
+                <option value="pending">Pending</option>
+                <option value="opening_balance">Opening Balance</option>
+              </Select>
+              <Select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+                className="w-auto text-sm"
+              >
+                <option value="">All statuses</option>
+                <option value="settled">Settled</option>
+                <option value="pending">Pending</option>
+              </Select>
+              {hasActiveFilters && (
                 <Button
                   type="button"
                   variant="ghost"
                   className="px-2 text-xs"
-                  onClick={() => { setSearch(""); setFromDate(""); setToDate(""); }}
+                  onClick={() => { setSearch(""); setFromDate(""); setToDate(""); setFilterType(""); setFilterStatus(""); }}
                 >
-                  Clear
+                  Clear all
                 </Button>
               )}
             </div>

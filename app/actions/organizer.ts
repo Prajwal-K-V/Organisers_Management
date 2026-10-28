@@ -172,10 +172,11 @@ export async function bulkCreatePlayers(tournamentId: string, formData: FormData
     );
 
     const chunkSize = 100;
-    for (let i = 0; i < payload.length; i += chunkSize) {
-      const { error } = await supabase.from("players").insert(payload.slice(i, i + chunkSize));
-      if (error) redirectWithFlash(path, "error", error.message);
-    }
+    const chunks: (typeof payload)[] = [];
+    for (let i = 0; i < payload.length; i += chunkSize) chunks.push(payload.slice(i, i + chunkSize));
+    const insertResults = await Promise.all(chunks.map((chunk) => supabase.from("players").insert(chunk)));
+    const insertError = insertResults.find((r) => r.error)?.error;
+    if (insertError) redirectWithFlash(path, "error", insertError.message);
 
     revalidatePlayerRosterPaths(tournamentId);
     redirectWithFlash(path, "success", `Added ${rows.length} players.`);
@@ -380,17 +381,18 @@ export async function movePlayerToTeam(tournamentId: string, playerId: string, f
 
     const oldTeamId = player.team_id;
 
-    const { data: rosterPlayers } = await supabase
-      .from("players")
-      .select("team_id, sold_price")
-      .eq("tournament_id", tournamentId);
-
-    const { data: newTeam } = await supabase
-      .from("teams")
-      .select("id, name, purse_total")
-      .eq("id", newTeamId)
-      .eq("tournament_id", tournamentId)
-      .maybeSingle();
+    const [{ data: rosterPlayers }, { data: newTeam }] = await Promise.all([
+      supabase
+        .from("players")
+        .select("team_id, sold_price")
+        .eq("tournament_id", tournamentId),
+      supabase
+        .from("teams")
+        .select("id, name, purse_total")
+        .eq("id", newTeamId)
+        .eq("tournament_id", tournamentId)
+        .maybeSingle(),
+    ]);
     if (!newTeam) redirectWithFlash(path, "error", "Team not found.");
 
     const remaining = teamPurseRemaining(newTeam.purse_total, rosterPlayers ?? [], newTeamId);
@@ -405,9 +407,11 @@ export async function movePlayerToTeam(tournamentId: string, playerId: string, f
       .eq("tournament_id", tournamentId);
     if (playerError) redirectWithFlash(path, "error", playerError.message);
 
-    const oldPurseError = await syncTeamPurseRemaining(supabase, tournamentId, oldTeamId);
+    const [oldPurseError, newPurseError] = await Promise.all([
+      syncTeamPurseRemaining(supabase, tournamentId, oldTeamId),
+      syncTeamPurseRemaining(supabase, tournamentId, newTeamId),
+    ]);
     if (oldPurseError) redirectWithFlash(path, "error", oldPurseError.message);
-    const newPurseError = await syncTeamPurseRemaining(supabase, tournamentId, newTeamId);
     if (newPurseError) redirectWithFlash(path, "error", newPurseError.message);
 
     revalidatePlayerRosterPaths(tournamentId);

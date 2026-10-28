@@ -25,11 +25,27 @@ async function assignPlayerSaleClientSide(
   supabase: Awaited<ReturnType<typeof getSupabase>>["supabase"],
   _profile: Awaited<ReturnType<typeof getSupabase>>["profile"]
 ) {
-  const { data: player, error: playerFetchError } = await supabase
-    .from("players")
-    .select("id, status, base_price, tournament_id, name")
-    .eq("id", playerId)
-    .single();
+  const [
+    { data: player, error: playerFetchError },
+    { data: team, error: teamFetchError },
+    { data: rosterPlayers },
+  ] = await Promise.all([
+    supabase
+      .from("players")
+      .select("id, status, base_price, tournament_id, name")
+      .eq("id", playerId)
+      .single(),
+    supabase
+      .from("teams")
+      .select("id, name, purse_total, tournament_id")
+      .eq("id", teamId)
+      .single(),
+    supabase
+      .from("players")
+      .select("team_id, sold_price")
+      .eq("tournament_id", tournamentId),
+  ]);
+
   if (playerFetchError || !player || player.tournament_id !== tournamentId) {
     redirectWithFlash(path, "error", "Player not found.");
   }
@@ -37,20 +53,10 @@ async function assignPlayerSaleClientSide(
   if (amount < Number(player.base_price)) {
     redirectWithFlash(path, "error", `Bid must be at least ${player.base_price}.`);
   }
-
-  const { data: team, error: teamFetchError } = await supabase
-    .from("teams")
-    .select("id, name, purse_total, tournament_id")
-    .eq("id", teamId)
-    .single();
   if (teamFetchError || !team || team.tournament_id !== tournamentId) {
     redirectWithFlash(path, "error", "Team not found.");
   }
 
-  const { data: rosterPlayers } = await supabase
-    .from("players")
-    .select("team_id, sold_price")
-    .eq("tournament_id", tournamentId);
   const remaining = teamPurseRemaining(team.purse_total, rosterPlayers ?? [], teamId);
   if (remaining < amount) {
     redirectWithFlash(path, "error", `${team.name} does not have enough purse remaining.`);
@@ -119,8 +125,10 @@ export async function assignPlayerSale(tournamentId: string, formData: FormData)
     revalidatePath(`/organizer/tournaments/${tournamentId}/team-view`);
     revalidatePath(`/organizer/tournaments/${tournamentId}/finance`);
 
-    const { data: player } = await supabase.from("players").select("name").eq("id", playerId).single();
-    const { data: team } = await supabase.from("teams").select("name").eq("id", teamId).single();
+    const [{ data: player }, { data: team }] = await Promise.all([
+      supabase.from("players").select("name").eq("id", playerId).single(),
+      supabase.from("teams").select("name").eq("id", teamId).single(),
+    ]);
     const label =
       player?.name && team?.name ? `${player.name} → ${team.name} for ${amount}.` : "Sale recorded.";
     redirectWithFlash(path, "success", label);
