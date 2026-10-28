@@ -242,14 +242,21 @@ export function FinanceManager({
   );
 
   const paymentBreakdown = useMemo(() => {
-    const map: Partial<Record<string, number>> = {};
+    const inMap: Partial<Record<string, number>> = {};
+    const outMap: Partial<Record<string, number>> = {};
     for (const row of ledger) {
       if (!row.payment_mode) continue;
       const tone = ledgerEntryTone(row.entry_type, Number(row.amount));
-      if (tone !== "income") continue;
-      map[row.payment_mode] = (map[row.payment_mode] ?? 0) + Number(row.amount);
+      if (tone === "income") {
+        inMap[row.payment_mode] = (inMap[row.payment_mode] ?? 0) + Number(row.amount);
+      } else if (tone === "expense") {
+        outMap[row.payment_mode] = (outMap[row.payment_mode] ?? 0) + Number(row.amount);
+      }
     }
-    return Object.entries(map).filter(([, v]) => v! > 0);
+    return {
+      income: Object.entries(inMap).filter(([, v]) => v! > 0),
+      outgoing: Object.entries(outMap).filter(([, v]) => v! > 0),
+    };
   }, [ledger]);
 
   const pendingTotal = useMemo(
@@ -321,17 +328,36 @@ export function FinanceManager({
           </div>
         </div>
 
-        {/* Payment mode breakdown */}
-        {paymentBreakdown.length > 0 && (
+        {/* Payment mode breakdown — income */}
+        {paymentBreakdown.income.length > 0 && (
           <div className="border-t border-[var(--border-subtle)] pt-3">
             <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Received by</p>
             <dl className="flex flex-wrap gap-4">
-              {paymentBreakdown.map(([mode, amount]) => (
+              {paymentBreakdown.income.map(([mode, amount]) => (
                 <div key={mode}>
                   <dt className="text-xs text-[var(--muted)]">
                     {PAYMENT_MODE_LABELS[mode as keyof typeof PAYMENT_MODE_LABELS] ?? mode}
                   </dt>
                   <dd className="text-sm font-semibold text-[var(--success-text)] tabular-nums">
+                    {formatCredits(amount!)}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+        )}
+
+        {/* Payment mode breakdown — outgoing */}
+        {paymentBreakdown.outgoing.length > 0 && (
+          <div className="border-t border-[var(--border-subtle)] pt-3">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Paid out by</p>
+            <dl className="flex flex-wrap gap-4">
+              {paymentBreakdown.outgoing.map(([mode, amount]) => (
+                <div key={mode}>
+                  <dt className="text-xs text-[var(--muted)]">
+                    {PAYMENT_MODE_LABELS[mode as keyof typeof PAYMENT_MODE_LABELS] ?? mode}
+                  </dt>
+                  <dd className="text-sm font-semibold text-[var(--danger)] tabular-nums">
                     {formatCredits(amount!)}
                   </dd>
                 </div>
