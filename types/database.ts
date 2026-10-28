@@ -8,7 +8,22 @@ export type LedgerEntryType =
   | "adjustment"
   | "expense"
   | "refund"
-  | "income";
+  | "income"
+  | "pending";
+
+export const PAYMENT_MODES = ["cash", "phonepe", "bank_transfer", "upi", "other"] as const;
+export type PaymentMode = (typeof PAYMENT_MODES)[number];
+
+export const PAYMENT_MODE_LABELS: Record<PaymentMode, string> = {
+  cash: "Cash",
+  phonepe: "PhonePe",
+  bank_transfer: "Bank Transfer",
+  upi: "UPI",
+  other: "Other",
+};
+
+export const LEDGER_STATUSES = ["settled", "pending"] as const;
+export type LedgerStatus = (typeof LEDGER_STATUSES)[number];
 
 export type Profile = {
   id: string;
@@ -94,6 +109,8 @@ export type FinancialLedgerEntry = {
   amount: number;
   reference_id: string | null;
   description: string | null;
+  payment_mode: string | null;
+  status: string;
   created_by: string | null;
   created_at: string;
 };
@@ -112,6 +129,8 @@ export type FinancialLedgerHistoryEntry = {
   entry_type: LedgerEntryType;
   amount: number;
   description: string | null;
+  payment_mode: string | null;
+  status: string | null;
   changed_by: string | null;
   changed_at: string;
 };
@@ -251,6 +270,8 @@ type Tables = {
       amount: number;
       reference_id?: string | null;
       description?: string | null;
+      payment_mode?: string | null;
+      status?: string;
       created_by?: string | null;
       created_at?: string;
     };
@@ -275,6 +296,8 @@ type Tables = {
       entry_type: LedgerEntryType;
       amount: number;
       description?: string | null;
+      payment_mode?: string | null;
+      status?: string | null;
       changed_by?: string | null;
       changed_at?: string;
     };

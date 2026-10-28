@@ -5,6 +5,7 @@ export const EDITABLE_LEDGER_ENTRY_TYPES: LedgerEntryType[] = [
   "income",
   "expense",
   "refund",
+  "pending",
   "opening_balance",
 ];
 
@@ -28,6 +29,8 @@ export function ledgerEntryTone(entryType: LedgerEntryType, amount: number): Led
     case "expense":
     case "bid":
       return "expense";
+    case "pending":
+      return "neutral";
     case "adjustment":
       return amount >= 0 ? "income" : "expense";
     default:
@@ -36,6 +39,7 @@ export function ledgerEntryTone(entryType: LedgerEntryType, amount: number): Led
 }
 
 export function formatLedgerEntryType(entryType: LedgerEntryType) {
+  if (entryType === "pending") return "Pending";
   return entryType.replace(/_/g, " ");
 }
 
@@ -47,4 +51,4 @@ export function isAuctionLedgerEntry(entryType: string) {
 export const MANUAL_LEDGER_FORM_TYPES: Exclude<
   LedgerEntryType,
   "bid" | "opening_balance"
->[] = ["adjustment", "income", "expense", "refund"];
+>[] = ["adjustment", "income", "expense", "refund", "pending"];
