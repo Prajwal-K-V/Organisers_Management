@@ -233,6 +233,7 @@ export function FinanceManager({
   const [toDate, setToDate] = useState("");
   const [filterType, setFilterType] = useState<string>("");
   const [filterStatus, setFilterStatus] = useState<string>("");
+  const [filterPaymentMode, setFilterPaymentMode] = useState<string>("");
 
   const totals = useMemo(() => sumLedgerFlows(ledger), [ledger]);
 
@@ -245,24 +246,39 @@ export function FinanceManager({
     const inMap: Partial<Record<string, number>> = {};
     const outMap: Partial<Record<string, number>> = {};
     for (const row of ledger) {
-      if (!row.payment_mode) continue;
+      if (row.status === "pending") continue;
+      const mode = row.payment_mode || "__none__";
       const tone = ledgerEntryTone(row.entry_type, Number(row.amount));
       if (tone === "income") {
-        inMap[row.payment_mode] = (inMap[row.payment_mode] ?? 0) + Number(row.amount);
+        inMap[mode] = (inMap[mode] ?? 0) + Number(row.amount);
       } else if (tone === "expense") {
-        outMap[row.payment_mode] = (outMap[row.payment_mode] ?? 0) + Number(row.amount);
+        outMap[mode] = (outMap[mode] ?? 0) + Number(row.amount);
       }
     }
+    const allModes = Array.from(new Set([...Object.keys(inMap), ...Object.keys(outMap)]));
+    const remaining = allModes.map((mode) => {
+      const net = (inMap[mode] ?? 0) - (outMap[mode] ?? 0);
+      return [mode, net] as [string, number];
+    });
     return {
       income: Object.entries(inMap).filter(([, v]) => v! > 0),
       outgoing: Object.entries(outMap).filter(([, v]) => v! > 0),
+      remaining,
     };
   }, [ledger]);
 
-  const pendingTotal = useMemo(
-    () => ledger.filter((r) => r.status === "pending").reduce((s, r) => s + Number(r.amount), 0),
-    [ledger]
-  );
+  const pendingBreakdown = useMemo(() => {
+    let income = 0;
+    let expense = 0;
+    for (const r of ledger) {
+      if (r.status !== "pending") continue;
+      const tone = ledgerEntryTone(r.entry_type, Number(r.amount));
+      if (tone === "income") income += Number(r.amount);
+      else if (tone === "expense") expense += Number(r.amount);
+      else income += Number(r.amount);
+    }
+    return { income, expense, total: income - expense };
+  }, [ledger]);
 
   const filteredLedger = useMemo(() => {
     const q = search.toLowerCase();
@@ -276,10 +292,11 @@ export function FinanceManager({
       .filter((e) => !fromDate || e.created_at >= fromDate)
       .filter((e) => !toDate || e.created_at <= toDate + "T23:59:59")
       .filter((e) => !filterType || e.entry_type === filterType)
-      .filter((e) => !filterStatus || e.status === filterStatus);
-  }, [sortedLedger, search, fromDate, toDate, filterType, filterStatus]);
+      .filter((e) => !filterStatus || e.status === filterStatus)
+      .filter((e) => !filterPaymentMode || (filterPaymentMode === "__none__" ? !e.payment_mode : e.payment_mode === filterPaymentMode));
+  }, [sortedLedger, search, fromDate, toDate, filterType, filterStatus, filterPaymentMode]);
 
-  const hasActiveFilters = Boolean(search || fromDate || toDate || filterType || filterStatus);
+  const hasActiveFilters = Boolean(search || fromDate || toDate || filterType || filterStatus || filterPaymentMode);
 
   const closeModals = () => {
     setAddOpen(false);
@@ -289,88 +306,100 @@ export function FinanceManager({
   return (
     <div className="space-y-5">
       {/* Summary card */}
-      <Card className="!p-4 space-y-4">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <dl className="grid grid-cols-3 gap-3 text-center sm:gap-6 sm:text-left">
+      <Card className="!p-0 overflow-hidden">
+        {/* Top bar: settled totals + actions */}
+        <div className="flex flex-col gap-4 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <dl className="grid grid-cols-3 gap-6">
             <div>
-              <dt className="text-xs text-[var(--muted)]">In</dt>
-              <dd className="text-lg font-bold text-[var(--success-text)] tabular-nums">{formatCredits(totals.income)}</dd>
+              <dt className="text-xs text-[var(--muted)]">Total In</dt>
+              <dd className="text-xl font-bold text-[var(--success-text)] tabular-nums">{formatCredits(totals.income)}</dd>
             </div>
             <div>
-              <dt className="text-xs text-[var(--muted)]">Out</dt>
-              <dd className="text-lg font-bold text-[var(--danger)] tabular-nums">{formatCredits(totals.outgoing)}</dd>
+              <dt className="text-xs text-[var(--muted)]">Total Out</dt>
+              <dd className="text-xl font-bold text-[var(--danger)] tabular-nums">{formatCredits(totals.outgoing)}</dd>
             </div>
             <div>
               <dt className="text-xs text-[var(--muted)]">Net</dt>
-              <dd
-                className={cn(
-                  "text-lg font-bold tabular-nums",
-                  totals.net >= 0 ? "text-[var(--success-text)]" : "text-[var(--danger)]"
-                )}
-              >
+              <dd className={cn("text-xl font-bold tabular-nums", totals.net >= 0 ? "text-[var(--success-text)]" : "text-[var(--danger)]")}>
                 {formatCredits(totals.net)}
               </dd>
             </div>
           </dl>
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            <Button type="button" className="w-full sm:w-auto" onClick={() => setAddOpen(true)}>
-              + Add entry
-            </Button>
+          <div className="flex gap-2 items-center">
+            <Button type="button" className="w-full sm:w-auto" onClick={() => setAddOpen(true)}>+ Add entry</Button>
             {ledger.length ? (
-              <a
-                href={csvHref}
-                download
-                className="text-center text-sm font-medium text-[var(--primary)] hover:underline sm:px-2"
-              >
+              <a href={csvHref} download className="text-sm font-medium text-[var(--primary)] hover:underline px-2">
                 Export CSV
               </a>
             ) : null}
           </div>
         </div>
 
-        {/* Payment mode breakdown — income */}
-        {paymentBreakdown.income.length > 0 && (
-          <div className="border-t border-[var(--border-subtle)] pt-3">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Received by</p>
-            <dl className="flex flex-wrap gap-4">
-              {paymentBreakdown.income.map(([mode, amount]) => (
-                <div key={mode}>
-                  <dt className="text-xs text-[var(--muted)]">
-                    {PAYMENT_MODE_LABELS[mode as keyof typeof PAYMENT_MODE_LABELS] ?? mode}
-                  </dt>
-                  <dd className="text-sm font-semibold text-[var(--success-text)] tabular-nums">
-                    {formatCredits(amount!)}
-                  </dd>
-                </div>
-              ))}
-            </dl>
-          </div>
-        )}
+        {/* Payment mode breakdown table */}
+        {paymentBreakdown.remaining.length > 0 && (() => {
+          const modeLabel = (mode: string) =>
+            mode === "__none__" ? "Unspecified" : (PAYMENT_MODE_LABELS[mode as keyof typeof PAYMENT_MODE_LABELS] ?? mode);
+          const inMap = Object.fromEntries(paymentBreakdown.income);
+          const outMap = Object.fromEntries(paymentBreakdown.outgoing);
+          return (
+            <div className="border-t border-[var(--border-subtle)] overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-[var(--border-subtle)]">
+                    <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Mode</th>
+                    <th className="px-4 py-2 text-right text-xs font-semibold uppercase tracking-wide text-[var(--success-text)]">In</th>
+                    <th className="px-4 py-2 text-right text-xs font-semibold uppercase tracking-wide text-[var(--danger)]">Out</th>
+                    <th className="px-4 py-2 text-right text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Remaining</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[var(--border-subtle)]">
+                  {paymentBreakdown.remaining.map(([mode, net]) => (
+                    <tr key={mode}>
+                      <td className="px-4 py-2.5 font-medium text-[var(--foreground)]">{modeLabel(mode)}</td>
+                      <td className="px-4 py-2.5 text-right tabular-nums text-[var(--success-text)]">
+                        {inMap[mode] ? formatCredits(inMap[mode]!) : "—"}
+                      </td>
+                      <td className="px-4 py-2.5 text-right tabular-nums text-[var(--danger)]">
+                        {outMap[mode] ? formatCredits(outMap[mode]!) : "—"}
+                      </td>
+                      <td className="px-4 py-2.5 text-right">
+                        <span
+                          className={cn("inline-block rounded-md px-2 py-0.5 text-sm font-bold tabular-nums",
+                            net >= 0 ? "text-[var(--success-text)]" : "text-[var(--danger)]"
+                          )}
+                          style={{ background: net >= 0 ? "var(--success-bg)" : "var(--error-bg)" }}
+                        >
+                          {formatCredits(net)}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          );
+        })()}
 
-        {/* Payment mode breakdown — outgoing */}
-        {paymentBreakdown.outgoing.length > 0 && (
-          <div className="border-t border-[var(--border-subtle)] pt-3">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Paid out by</p>
-            <dl className="flex flex-wrap gap-4">
-              {paymentBreakdown.outgoing.map(([mode, amount]) => (
-                <div key={mode}>
-                  <dt className="text-xs text-[var(--muted)]">
-                    {PAYMENT_MODE_LABELS[mode as keyof typeof PAYMENT_MODE_LABELS] ?? mode}
-                  </dt>
-                  <dd className="text-sm font-semibold text-[var(--danger)] tabular-nums">
-                    {formatCredits(amount!)}
-                  </dd>
-                </div>
-              ))}
-            </dl>
-          </div>
-        )}
-
-        {/* Pending total */}
-        {pendingTotal > 0 && (
-          <div className="border-t border-[var(--border-subtle)] pt-3 flex items-center gap-2">
-            <span className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Pending</span>
-            <span className="text-sm font-semibold text-amber-600 tabular-nums">{formatCredits(pendingTotal)}</span>
+        {/* Pending strip */}
+        {(pendingBreakdown.income > 0 || pendingBreakdown.expense > 0) && (
+          <div className="border-t border-[var(--border-subtle)] bg-amber-50/60 px-4 py-3 flex flex-wrap items-center gap-x-6 gap-y-1">
+            <span className="text-xs font-semibold uppercase tracking-wide text-amber-700">Pending</span>
+            {pendingBreakdown.income > 0 && (
+              <span className="text-xs text-[var(--muted)]">
+                In <span className="font-semibold text-[var(--success-text)] tabular-nums">+{formatCredits(pendingBreakdown.income)}</span>
+              </span>
+            )}
+            {pendingBreakdown.expense > 0 && (
+              <span className="text-xs text-[var(--muted)]">
+                Out <span className="font-semibold text-[var(--danger)] tabular-nums">−{formatCredits(pendingBreakdown.expense)}</span>
+              </span>
+            )}
+            <span className="text-xs text-[var(--muted)]">
+              Net{" "}
+              <span className={cn("font-semibold tabular-nums", pendingBreakdown.total >= 0 ? "text-[var(--success-text)]" : "text-[var(--danger)]")}>
+                {pendingBreakdown.total >= 0 ? "+" : "−"}{formatCredits(Math.abs(pendingBreakdown.total))}
+              </span>
+            </span>
           </div>
         )}
       </Card>
@@ -437,12 +466,23 @@ export function FinanceManager({
                 <option value="settled">Settled</option>
                 <option value="pending">Pending</option>
               </Select>
+              <Select
+                value={filterPaymentMode}
+                onChange={(e) => setFilterPaymentMode(e.target.value)}
+                className="w-auto text-sm"
+              >
+                <option value="">All payment modes</option>
+                {PAYMENT_MODES.map((mode) => (
+                  <option key={mode} value={mode}>{PAYMENT_MODE_LABELS[mode]}</option>
+                ))}
+                <option value="__none__">Unspecified</option>
+              </Select>
               {hasActiveFilters && (
                 <Button
                   type="button"
                   variant="ghost"
                   className="px-2 text-xs"
-                  onClick={() => { setSearch(""); setFromDate(""); setToDate(""); setFilterType(""); setFilterStatus(""); }}
+                  onClick={() => { setSearch(""); setFromDate(""); setToDate(""); setFilterType(""); setFilterStatus(""); setFilterPaymentMode(""); }}
                 >
                   Clear all
                 </Button>
@@ -483,7 +523,9 @@ export function FinanceManager({
                           <span className="text-xs text-[var(--muted)]">{formatLedgerDate(row.created_at)}</span>
                           <span className="text-xs text-[var(--muted)]">· Added by {profileLabel(row.creator)}</span>
                           {paymentLabel && (
-                            <span className="text-xs text-[var(--muted)]">· via {paymentLabel}</span>
+                            <span className="inline-flex items-center rounded-full border border-[var(--border)] bg-[var(--muted-bg)] px-2 py-0.5 text-xs font-medium text-[var(--foreground)]">
+                              {paymentLabel}
+                            </span>
                           )}
                         </div>
                         <p className="mt-1 truncate text-sm text-stone-800">

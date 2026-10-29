@@ -1,6 +1,7 @@
 export type LedgerFlowRow = {
   entry_type: string;
   amount: number;
+  status?: string | null;
 };
 
 export type FinanceTotals = {
@@ -18,6 +19,7 @@ export function sumLedgerFlows(rows: LedgerFlowRow[]): FinanceTotals {
     const amount = Number(row.amount);
     const type = row.entry_type;
     if (type === "bid") continue;
+    if (row.status === "pending") continue;
 
     switch (type) {
       case "income":
@@ -29,6 +31,8 @@ export function sumLedgerFlows(rows: LedgerFlowRow[]): FinanceTotals {
         break;
       case "expense":
         outgoing += Math.abs(amount);
+        break;
+      case "pending":
         break;
       case "adjustment":
         if (amount >= 0) income += amount;
