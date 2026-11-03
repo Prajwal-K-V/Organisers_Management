@@ -10,7 +10,7 @@ export default async function FinancePage({ params }: { params: Promise<{ id: st
   const { supabase, profile } = await requireOrganizer();
   const { id: tournamentId } = await params;
 
-  const [teams, { data: ledger }, { data: history }, canDeleteLedger] = await Promise.all([
+  const [teams, { data: ledger }, { data: history }, canDeleteLedger, { data: organizerRows }] = await Promise.all([
     fetchOrganizerTeams(supabase, tournamentId),
     supabase
       .from("financial_ledger")
@@ -23,7 +23,19 @@ export default async function FinancePage({ params }: { params: Promise<{ id: st
       .eq("tournament_id", tournamentId)
       .order("changed_at", { ascending: false }),
     getCanDeleteLedgerForTournament(supabase, tournamentId, profile.id),
+    supabase
+      .from("tournament_organizers")
+      .select("profile_id, profiles!profile_id(full_name, email)")
+      .eq("tournament_id", tournamentId),
   ]);
+
+  const organizers = (organizerRows ?? []).flatMap((row) => {
+    const p = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles;
+    if (!p) return [];
+    const name = (p as { full_name: string | null; email: string }).full_name?.trim()
+      || (p as { full_name: string | null; email: string }).email;
+    return [{ id: row.profile_id, name }];
+  });
 
   const creatorIds = [
     ...new Set(
@@ -75,7 +87,7 @@ export default async function FinancePage({ params }: { params: Promise<{ id: st
   }
 
   const csvRows = [
-    ["date", "type", "payment_mode", "status", "team_id", "amount", "added_by", "description"].join(","),
+    ["date", "type", "payment_mode", "received_by", "status", "team_id", "amount", "added_by", "description"].join(","),
     ...financeLedger.map((row) => {
       const addedBy =
         row.creator?.full_name?.trim() || row.creator?.email || "";
@@ -83,6 +95,7 @@ export default async function FinancePage({ params }: { params: Promise<{ id: st
         row.created_at,
         row.entry_type,
         row.payment_mode ?? "",
+        `"${row.received_by_name ?? ""}"`,
         row.status ?? "settled",
         row.team_id ?? "",
         row.amount,
@@ -98,6 +111,7 @@ export default async function FinancePage({ params }: { params: Promise<{ id: st
     <FinanceManager
       tournamentId={tournamentId}
       teams={teams}
+      organizers={organizers}
       ledger={financeLedger}
       historyByLedgerId={historyByLedgerId}
       canDeleteLedger={canDeleteLedger}

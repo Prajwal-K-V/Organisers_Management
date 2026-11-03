@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { addLedgerEntry, deleteLedgerEntry, updateLedgerEntry } from "@/app/actions/organizer";
+import { addLedgerEntry, bulkUpdateLedgerReceivedBy, deleteLedgerEntry, updateLedgerEntry } from "@/app/actions/organizer";
 import { ConfirmDeleteButton, ConfirmSubmit } from "@/components/confirm-submit";
 import { EmptyState } from "@/components/empty-state";
 import { SubmitButton } from "@/components/submit-button";
@@ -55,12 +55,14 @@ const ENTRY_TYPE_LABELS: Record<(typeof MANUAL_LEDGER_FORM_TYPES)[number], strin
 function LedgerEntryForm({
   tournamentId,
   teams,
+  organizers,
   entry,
   initialEntryType = "income",
   onDone,
 }: {
   tournamentId: string;
   teams: Team[];
+  organizers: { id: string; name: string }[];
   entry?: FinancialLedgerEntryWithCreator;
   initialEntryType?: LedgerEntryType;
   onDone: () => void;
@@ -109,6 +111,23 @@ function LedgerEntryForm({
           placeholder="What was this for?"
           defaultValue={entry?.description ?? ""}
         />
+        <label className="block space-y-1.5">
+          <span className="text-sm font-medium">Received By</span>
+          <input
+            name="received_by_name"
+            list="received-by-options"
+            placeholder="Who received / paid this?"
+            defaultValue={entry?.received_by_name ?? ""}
+            className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm placeholder:text-[var(--muted)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+          />
+          {organizers.length > 0 && (
+            <datalist id="received-by-options">
+              {organizers.map((o) => (
+                <option key={o.id} value={o.name} />
+              ))}
+            </datalist>
+          )}
+        </label>
         <label className="block space-y-1.5">
           <span className="text-sm font-medium">Payment Mode</span>
           <Select name="payment_mode" defaultValue={entry?.payment_mode ?? ""}>
@@ -173,6 +192,7 @@ function LedgerHistoryList({
                 amount: current.amount,
                 description: current.description,
                 payment_mode: current.payment_mode,
+                received_by_name: current.received_by_name,
                 status: current.status,
               }
             : {
@@ -180,6 +200,7 @@ function LedgerHistoryList({
                 amount: sorted[index - 1].amount,
                 description: sorted[index - 1].description,
                 payment_mode: sorted[index - 1].payment_mode,
+                received_by_name: sorted[index - 1].received_by_name,
                 status: sorted[index - 1].status,
               };
 
@@ -195,6 +216,9 @@ function LedgerHistoryList({
         }
         if ((row.payment_mode ?? "") !== (next.payment_mode ?? "")) {
           changes.push("payment mode updated");
+        }
+        if ((row.received_by_name ?? "") !== (next.received_by_name ?? "")) {
+          changes.push(`received by: ${row.received_by_name ?? "—"} → ${next.received_by_name ?? "—"}`);
         }
         if ((row.status ?? "") !== (next.status ?? "")) {
           changes.push(`status: ${row.status ?? "—"} → ${next.status ?? "—"}`);
@@ -214,6 +238,7 @@ function LedgerHistoryList({
 export function FinanceManager({
   tournamentId,
   teams,
+  organizers,
   ledger,
   historyByLedgerId,
   canDeleteLedger,
@@ -221,6 +246,7 @@ export function FinanceManager({
 }: {
   tournamentId: string;
   teams: Team[];
+  organizers: { id: string; name: string }[];
   ledger: FinancialLedgerEntryWithCreator[];
   historyByLedgerId: Record<string, FinancialLedgerHistoryWithEditor[]>;
   canDeleteLedger: boolean;
@@ -234,6 +260,8 @@ export function FinanceManager({
   const [filterType, setFilterType] = useState<string>("");
   const [filterStatus, setFilterStatus] = useState<string>("");
   const [filterPaymentMode, setFilterPaymentMode] = useState<string>("");
+  const [filterReceivedBy, setFilterReceivedBy] = useState<string>("");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const totals = useMemo(() => sumLedgerFlows(ledger), [ledger]);
 
@@ -293,10 +321,35 @@ export function FinanceManager({
       .filter((e) => !toDate || e.created_at <= toDate + "T23:59:59")
       .filter((e) => !filterType || e.entry_type === filterType)
       .filter((e) => !filterStatus || e.status === filterStatus)
-      .filter((e) => !filterPaymentMode || (filterPaymentMode === "__none__" ? !e.payment_mode : e.payment_mode === filterPaymentMode));
-  }, [sortedLedger, search, fromDate, toDate, filterType, filterStatus, filterPaymentMode]);
+      .filter((e) => !filterPaymentMode || (filterPaymentMode === "__none__" ? !e.payment_mode : e.payment_mode === filterPaymentMode))
+      .filter((e) => !filterReceivedBy || (e.received_by_name ?? "").toLowerCase().includes(filterReceivedBy.toLowerCase()));
+  }, [sortedLedger, search, fromDate, toDate, filterType, filterStatus, filterPaymentMode, filterReceivedBy]);
 
-  const hasActiveFilters = Boolean(search || fromDate || toDate || filterType || filterStatus || filterPaymentMode);
+  const hasActiveFilters = Boolean(search || fromDate || toDate || filterType || filterStatus || filterPaymentMode || filterReceivedBy);
+
+  const editableFilteredIds = useMemo(
+    () => filteredLedger.filter((e) => isEditableLedgerEntry(e.entry_type)).map((e) => e.id),
+    [filteredLedger]
+  );
+
+  const allEditableSelected = editableFilteredIds.length > 0 && editableFilteredIds.every((id) => selectedIds.has(id));
+  const someSelected = editableFilteredIds.some((id) => selectedIds.has(id));
+
+  const toggleRow = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (allEditableSelected) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(editableFilteredIds));
+    }
+  };
 
   const closeModals = () => {
     setAddOpen(false);
@@ -477,12 +530,27 @@ export function FinanceManager({
                 ))}
                 <option value="__none__">Unspecified</option>
               </Select>
+              <input
+                type="search"
+                placeholder="Received by…"
+                value={filterReceivedBy}
+                onChange={(e) => setFilterReceivedBy(e.target.value)}
+                list="filter-received-by-options"
+                className="rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm placeholder:text-[var(--muted)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+              />
+              {organizers.length > 0 && (
+                <datalist id="filter-received-by-options">
+                  {organizers.map((o) => (
+                    <option key={o.id} value={o.name} />
+                  ))}
+                </datalist>
+              )}
               {hasActiveFilters && (
                 <Button
                   type="button"
                   variant="ghost"
                   className="px-2 text-xs"
-                  onClick={() => { setSearch(""); setFromDate(""); setToDate(""); setFilterType(""); setFilterStatus(""); setFilterPaymentMode(""); }}
+                  onClick={() => { setSearch(""); setFromDate(""); setToDate(""); setFilterType(""); setFilterStatus(""); setFilterPaymentMode(""); setFilterReceivedBy(""); }}
                 >
                   Clear all
                 </Button>
@@ -490,12 +558,63 @@ export function FinanceManager({
             </div>
           </div>
 
+          {/* Bulk action bar */}
+          {selectedIds.size > 0 && (
+            <form
+              action={bulkUpdateLedgerReceivedBy.bind(null, tournamentId)}
+              onSubmit={() => setSelectedIds(new Set())}
+              className="flex flex-wrap items-center gap-2 rounded-lg border border-[var(--primary)] bg-[var(--accent-soft)] px-3 py-2"
+            >
+              <input type="hidden" name="ledger_ids" value={[...selectedIds].join(",")} />
+              <span className="text-xs font-semibold text-[var(--accent-foreground)]">
+                {selectedIds.size} selected
+              </span>
+              <span className="text-xs text-[var(--muted)]">— Set Received By:</span>
+              <input
+                name="received_by_name"
+                list="bulk-received-by-options"
+                placeholder="Name…"
+                className="flex-1 min-w-[140px] rounded-md border border-[var(--border)] bg-white px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+              />
+              {organizers.length > 0 && (
+                <datalist id="bulk-received-by-options">
+                  {organizers.map((o) => (
+                    <option key={o.id} value={o.name} />
+                  ))}
+                </datalist>
+              )}
+              <SubmitButton pendingLabel="Applying…" className="text-sm py-1 px-3">
+                Apply to {selectedIds.size} {selectedIds.size === 1 ? "entry" : "entries"}
+              </SubmitButton>
+              <Button type="button" variant="ghost" className="px-2 text-xs" onClick={() => setSelectedIds(new Set())}>
+                Clear
+              </Button>
+            </form>
+          )}
+
           <Card className="!p-0 overflow-hidden">
             {filteredLedger.length === 0 ? (
               <div className="px-4 py-8 text-center text-sm text-[var(--muted)]">
                 No entries match your filters.
               </div>
             ) : (
+              <>
+                {/* Select-all toolbar */}
+                {editableFilteredIds.length > 0 && (
+                  <div className="flex items-center gap-2 border-b border-[var(--border-subtle)] px-4 py-2">
+                    <input
+                      type="checkbox"
+                      checked={allEditableSelected}
+                      ref={(el) => { if (el) el.indeterminate = someSelected && !allEditableSelected; }}
+                      onChange={toggleSelectAll}
+                      className="h-4 w-4 cursor-pointer accent-[var(--primary)]"
+                      aria-label="Select all visible"
+                    />
+                    <span className="text-xs text-[var(--muted)]">
+                      {allEditableSelected ? "Deselect all" : `Select all (${editableFilteredIds.length})`}
+                    </span>
+                  </div>
+                )}
               <ul className="divide-y divide-[var(--border-subtle)]">
                 {filteredLedger.map((row) => {
                   const tone = ledgerEntryTone(row.entry_type, Number(row.amount));
@@ -509,7 +628,18 @@ export function FinanceManager({
                     : null;
 
                   return (
-                    <li key={row.id} className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                    <li key={row.id} className="flex gap-3 px-4 py-3 items-start sm:items-center">
+                      {editable && (
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(row.id)}
+                          onChange={() => toggleRow(row.id)}
+                          className="mt-1 h-4 w-4 shrink-0 cursor-pointer accent-[var(--primary)] sm:mt-0"
+                          aria-label="Select entry"
+                        />
+                      )}
+                      {!editable && <span className="w-4 shrink-0" />}
+                      <div className="min-w-0 flex-1 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
                           <Badge variant={badgeVariant} className="normal-case tracking-normal">
@@ -525,6 +655,11 @@ export function FinanceManager({
                           {paymentLabel && (
                             <span className="inline-flex items-center rounded-full border border-[var(--border)] bg-[var(--muted-bg)] px-2 py-0.5 text-xs font-medium text-[var(--foreground)]">
                               {paymentLabel}
+                            </span>
+                          )}
+                          {row.received_by_name && (
+                            <span className="inline-flex items-center rounded-full border border-[var(--primary)] bg-[var(--accent-soft)] px-2 py-0.5 text-xs font-medium text-[var(--accent-foreground)]">
+                              {row.received_by_name}
                             </span>
                           )}
                         </div>
@@ -564,23 +699,25 @@ export function FinanceManager({
                           ) : null}
                         </div>
                       </div>
+                      </div>
                     </li>
                   );
                 })}
               </ul>
+              </>
             )}
           </Card>
         </>
       )}
 
       <Modal open={addOpen} onClose={closeModals} title="Add entry">
-        <LedgerEntryForm tournamentId={tournamentId} teams={teams} onDone={closeModals} />
+        <LedgerEntryForm tournamentId={tournamentId} teams={teams} organizers={organizers} onDone={closeModals} />
       </Modal>
 
       <Modal open={Boolean(editing)} onClose={closeModals} title="Edit entry">
         {editing ? (
           <div className="space-y-5">
-            <LedgerEntryForm tournamentId={tournamentId} teams={teams} entry={editing} onDone={closeModals} />
+            <LedgerEntryForm tournamentId={tournamentId} teams={teams} organizers={organizers} entry={editing} onDone={closeModals} />
             <div className="border-t border-stone-100 pt-4">
               <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">History</p>
               <LedgerHistoryList history={historyByLedgerId[editing.id] ?? []} current={editing} />

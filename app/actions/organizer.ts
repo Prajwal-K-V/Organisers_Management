@@ -452,6 +452,7 @@ type ManualLedgerFormValues = {
   amount: number;
   description: string | null;
   paymentMode: string | null;
+  receivedByName: string | null;
   status: string;
 };
 
@@ -467,6 +468,7 @@ function parseManualLedgerForm(
   const amount = Number(formData.get("amount") ?? 0);
   const description = String(formData.get("description") ?? "").trim();
   const rawPaymentMode = String(formData.get("payment_mode") ?? "").trim();
+  const rawReceivedByName = String(formData.get("received_by_name") ?? "").trim();
   const rawStatus = String(formData.get("status") ?? "settled").trim();
   const allowed = options?.allowOpeningBalance
     ? [...MANUAL_LEDGER_FORM_TYPES, "opening_balance"]
@@ -478,6 +480,7 @@ function parseManualLedgerForm(
     return { ok: false, message: "Invalid amount." };
   }
   const paymentMode = rawPaymentMode && VALID_PAYMENT_MODES.includes(rawPaymentMode) ? rawPaymentMode : null;
+  const receivedByName = rawReceivedByName || null;
   const status = VALID_STATUSES.includes(rawStatus) ? rawStatus : "settled";
   return {
     ok: true,
@@ -487,6 +490,7 @@ function parseManualLedgerForm(
       amount,
       description: description || null,
       paymentMode,
+      receivedByName,
       status,
     },
   };
@@ -501,7 +505,7 @@ export async function addLedgerEntry(tournamentId: string, formData: FormData) {
     if (!parsed.ok) {
       redirectWithFlash(path, "error", parsed.message);
     }
-    const { teamId, entryType, amount, description, paymentMode, status } = parsed.value;
+    const { teamId, entryType, amount, description, paymentMode, receivedByName, status } = parsed.value;
     const { error } = await supabase.from("financial_ledger").insert({
       tournament_id: tournamentId,
       team_id: teamId,
@@ -509,9 +513,10 @@ export async function addLedgerEntry(tournamentId: string, formData: FormData) {
       amount,
       description,
       payment_mode: paymentMode,
+      received_by_name: receivedByName,
       status,
       created_by: profile.id,
-    });
+    } as any);
     if (error) redirectWithFlash(path, "error", error.message);
     revalidatePath(path);
     redirectWithFlash(path, "success", "Ledger entry saved.");
@@ -543,7 +548,7 @@ export async function updateLedgerEntry(tournamentId: string, ledgerId: string, 
     if (!parsed.ok) {
       redirectWithFlash(path, "error", parsed.message);
     }
-    const { teamId, entryType, amount, description, paymentMode, status } = parsed.value;
+    const { teamId, entryType, amount, description, paymentMode, receivedByName, status } = parsed.value;
 
     const { error } = await supabase
       .from("financial_ledger")
@@ -553,8 +558,9 @@ export async function updateLedgerEntry(tournamentId: string, ledgerId: string, 
         amount,
         description,
         payment_mode: paymentMode,
+        received_by_name: receivedByName,
         status,
-      })
+      } as any)
       .eq("id", ledgerId)
       .eq("tournament_id", tournamentId);
     if (error) redirectWithFlash(path, "error", error.message);
@@ -597,5 +603,28 @@ export async function deleteLedgerEntry(tournamentId: string, ledgerId: string) 
   } catch (e) {
     if (e && typeof e === "object" && "digest" in e) throw e;
     redirectWithFlash(path, "error", "Could not delete entry.");
+  }
+}
+
+export async function bulkUpdateLedgerReceivedBy(tournamentId: string, formData: FormData) {
+  const path = `${tournamentBase(tournamentId)}/finance`;
+  try {
+    const { supabase } = await getSupabase();
+    await prepareTournamentWrite(supabase, tournamentId, path);
+    const raw = String(formData.get("ledger_ids") ?? "").trim();
+    const ids = raw.split(",").map((s) => s.trim()).filter(Boolean);
+    if (!ids.length) redirectWithFlash(path, "error", "No entries selected.");
+    const receivedByName = String(formData.get("received_by_name") ?? "").trim() || null;
+    const { error } = await supabase
+      .from("financial_ledger")
+      .update({ received_by_name: receivedByName } as any)
+      .in("id", ids)
+      .eq("tournament_id", tournamentId);
+    if (error) redirectWithFlash(path, "error", error.message);
+    revalidatePath(path);
+    redirectWithFlash(path, "success", `Updated ${ids.length} ${ids.length === 1 ? "entry" : "entries"}.`);
+  } catch (e) {
+    if (e && typeof e === "object" && "digest" in e) throw e;
+    redirectWithFlash(path, "error", "Could not update entries.");
   }
 }
