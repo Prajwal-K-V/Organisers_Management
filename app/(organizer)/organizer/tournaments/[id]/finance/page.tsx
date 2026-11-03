@@ -1,10 +1,12 @@
 import { FinanceManager } from "@/components/finance-manager";
-import { isAuctionLedgerEntry } from "@/lib/ledger";
+import { PersonFinanceBreakdown } from "@/components/person-finance-breakdown";
+import type { PersonFinanceRow } from "@/components/person-finance-breakdown";
+import { isAuctionLedgerEntry, ledgerEntryTone } from "@/lib/ledger";
 import { enrichLedgerCreators, enrichLedgerHistoryEditors } from "@/lib/ledger-profiles";
 import { getCanDeleteLedgerForTournament } from "@/lib/tournament-organizer";
 import { fetchOrganizerTeams } from "@/lib/organizer-queries";
 import { requireOrganizer } from "@/utils/supabase/utility/auth";
-import type { FinancialLedgerEntryWithCreator, FinancialLedgerHistoryWithEditor } from "@/types/database";
+import type { FinancialLedgerEntryWithCreator, FinancialLedgerHistoryWithEditor, LedgerEntryType } from "@/types/database";
 
 export default async function FinancePage({ params }: { params: Promise<{ id: string }> }) {
   const { supabase, profile } = await requireOrganizer();
@@ -107,15 +109,47 @@ export default async function FinancePage({ params }: { params: Promise<{ id: st
 
   const csvHref = `data:text/csv;charset=utf-8,${encodeURIComponent(csvRows)}`;
 
+  const personMap = new Map<string, PersonFinanceRow>();
+  for (const row of financeLedger) {
+    if (row.status === "pending") continue;
+    const tone = ledgerEntryTone(row.entry_type as LedgerEntryType, row.amount);
+    if (tone === "neutral") continue;
+    const key = (row as any).received_by_name?.trim() || "__unassigned__";
+    const label = key === "__unassigned__" ? "Unassigned" : key;
+    if (!personMap.has(key)) {
+      personMap.set(key, { name: label, cashIn: 0, phonePeIn: 0, totalIn: 0, paidOut: 0 });
+    }
+    const p = personMap.get(key)!;
+    const amt = Math.abs(row.amount);
+    if (tone === "income") {
+      p.totalIn += amt;
+      if (row.payment_mode === "cash") p.cashIn += amt;
+      else if (row.payment_mode === "phonepe") p.phonePeIn += amt;
+    } else {
+      p.paidOut += amt;
+    }
+  }
+
+  const personRows: PersonFinanceRow[] = [...personMap.entries()]
+    .sort(([aKey, a], [bKey, b]) => {
+      if (aKey === "__unassigned__") return 1;
+      if (bKey === "__unassigned__") return -1;
+      return b.totalIn - a.totalIn;
+    })
+    .map(([, row]) => row);
+
   return (
-    <FinanceManager
-      tournamentId={tournamentId}
-      teams={teams}
-      organizers={organizers}
-      ledger={financeLedger}
-      historyByLedgerId={historyByLedgerId}
-      canDeleteLedger={canDeleteLedger}
-      csvHref={csvHref}
-    />
+    <div className="space-y-6">
+      <PersonFinanceBreakdown rows={personRows} />
+      <FinanceManager
+        tournamentId={tournamentId}
+        teams={teams}
+        organizers={organizers}
+        ledger={financeLedger}
+        historyByLedgerId={historyByLedgerId}
+        canDeleteLedger={canDeleteLedger}
+        csvHref={csvHref}
+      />
+    </div>
   );
 }

@@ -13,7 +13,7 @@ export type PersonFinanceRow = {
 
 function Amt({ value, style }: { value: number; style?: React.CSSProperties }) {
   if (!value) return <span className="text-[var(--muted)]">—</span>;
-  return <span style={style}>{formatCredits(value)}</span>;
+  return <span style={style}>{formatCredits(Math.abs(value))}</span>;
 }
 
 export function PersonFinanceBreakdown({ rows }: { rows: PersonFinanceRow[] }) {
@@ -32,11 +32,14 @@ export function PersonFinanceBreakdown({ rows }: { rows: PersonFinanceRow[] }) {
               <th className="text-right pb-2 font-medium text-[var(--muted)] pr-4">Cash In</th>
               <th className="text-right pb-2 font-medium text-[var(--muted)] pr-4">PhonePe In</th>
               <th className="text-right pb-2 font-medium text-[var(--muted)] pr-4">Total In</th>
-              <th className="text-right pb-2 font-medium text-[var(--muted)]">Paid Out</th>
+              <th className="text-right pb-2 font-medium text-[var(--muted)] pr-4">Paid Out</th>
+              <th className="text-right pb-2 font-medium text-[var(--muted)]">Remaining</th>
             </tr>
           </thead>
           <tbody>
-            {rows.map((row) => (
+            {rows.map((row) => {
+              const remaining = row.totalIn - row.paidOut;
+              return (
               <tr key={row.name} className="border-b border-[var(--border)] last:border-0">
                 <td className="py-2 pr-4 font-medium">{row.name}</td>
                 <td className="py-2 pr-4 text-right">
@@ -48,11 +51,15 @@ export function PersonFinanceBreakdown({ rows }: { rows: PersonFinanceRow[] }) {
                 <td className="py-2 pr-4 text-right font-semibold">
                   <Amt value={row.totalIn} style={{ color: "var(--success-text)" }} />
                 </td>
-                <td className="py-2 text-right">
+                <td className="py-2 pr-4 text-right">
                   <Amt value={row.paidOut} style={{ color: "var(--danger)" }} />
                 </td>
+                <td className="py-2 text-right font-semibold">
+                  <Amt value={remaining} style={{ color: remaining >= 0 ? "var(--success-text)" : "var(--danger)" }} />
+                </td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </div>
