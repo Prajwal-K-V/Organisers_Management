@@ -110,6 +110,7 @@ export type FinancialLedgerEntry = {
   reference_id: string | null;
   description: string | null;
   payment_mode: string | null;
+  received_by_name: string | null;
   status: string;
   created_by: string | null;
   created_at: string;
@@ -130,6 +131,7 @@ export type FinancialLedgerHistoryEntry = {
   amount: number;
   description: string | null;
   payment_mode: string | null;
+  received_by_name: string | null;
   status: string | null;
   changed_by: string | null;
   changed_at: string;
